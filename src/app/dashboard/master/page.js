@@ -1,0 +1,316 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Swal from 'sweetalert2'; // 👈 Import SweetAlert2
+
+export default function MasterDataPage() {
+  const [role, setRole] = useState('');
+  const [dataTruk, setDataTruk] = useState([]);
+  const [dataBarang, setDataBarang] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [prosesLoading, setProsesLoading] = useState(false);
+
+  // State Modal Tambah
+  const [showModalTruk, setShowModalTruk] = useState(false);
+  const [formTruk, setFormTruk] = useState({ nama: '', plat: '', sopir: '', odo: '' });
+  const [showModalBarang, setShowModalBarang] = useState(false);
+  const [formBarang, setFormBarang] = useState({ nama: '', batas_km: '', stok: '', harga: '', tanggal: '' });
+
+  // State Modal Edit
+  const [showEditTruk, setShowEditTruk] = useState(false);
+  const [editTruk, setEditTruk] = useState({ id: '', nama: '', plat: '', sopir: '', odo: '' });
+  const [showEditBarang, setShowEditBarang] = useState(false);
+  const [editBarang, setEditBarang] = useState({ id: '', nama: '', batas_km: '', stok: '', harga: '' });
+
+  useEffect(() => { 
+    setRole(localStorage.getItem('sas_role') || '');
+    fetchData(); 
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/sas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "GET_DATA" })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setDataTruk(result.data.truk);
+        setDataBarang(result.data.barang);
+      }
+    } catch (err) { 
+      Swal.fire('Oops!', 'Gagal memuat data dari server.', 'error'); 
+    }
+    setLoading(false);
+  };
+
+  // ================= FUNGSI TRUK DENGAN SWEETALERT =================
+  const handleSimpanTruk = async (e) => {
+    e.preventDefault(); setProsesLoading(true);
+    const username = localStorage.getItem('sas_user');
+    try {
+      const response = await fetch('/api/sas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "TAMBAH_TRUK", ...formTruk, username })
+      });
+      const result = await response.json();
+      if (result.success) {
+        Swal.fire({ title: 'Berhasil!', text: result.message, icon: 'success', timer: 2000, showConfirmButton: false });
+        setShowModalTruk(false);
+        setFormTruk({ nama: '', plat: '', sopir: '', odo: '' }); fetchData();
+      } else Swal.fire('Gagal!', result.message, 'error');
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
+    setProsesLoading(false);
+  };
+
+  const handleUpdateTruk = async (e) => {
+    e.preventDefault(); setProsesLoading(true);
+    const username = localStorage.getItem('sas_user');
+    try {
+      const response = await fetch('/api/sas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "EDIT_TRUK", ...editTruk, username })
+      });
+      const result = await response.json();
+      if (result.success) { 
+        Swal.fire({ title: 'Tersimpan!', text: result.message, icon: 'success', timer: 1500, showConfirmButton: false });
+        setShowEditTruk(false); fetchData(); 
+      } else Swal.fire('Gagal!', result.message, 'error');
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
+    setProsesLoading(false);
+  };
+
+  const handleHapusTruk = async (id) => {
+    // Pop-up Konfirmasi Hapus yang Elegan
+    const confirmBox = await Swal.fire({
+      title: 'Yakin buang ke Arsip?',
+      text: `Truk ${id} akan disembunyikan dari sistem utama!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ff4d4f',
+      cancelButtonColor: '#888',
+      confirmButtonText: 'Ya, Buang!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (confirmBox.isConfirmed) {
+      const username = localStorage.getItem('sas_user');
+      try {
+        const response = await fetch('/api/sas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: "HAPUS_TRUK", id, username })
+        });
+        const result = await response.json();
+        if (result.success) {
+          Swal.fire('Dihapus!', 'Data telah dipindahkan ke Arsip.', 'success');
+          fetchData();
+        } else {
+          Swal.fire('Gagal!', result.message, 'error');
+        }
+      } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
+    }
+  };
+
+  // ================= FUNGSI BARANG DENGAN SWEETALERT =================
+  const handleSimpanBarang = async (e) => {
+    e.preventDefault(); setProsesLoading(true);
+    const username = localStorage.getItem('sas_user');
+    try {
+      const response = await fetch('/api/sas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "TAMBAH_BARANG", ...formBarang, username })
+      });
+      const result = await response.json();
+      if (result.success) {
+        Swal.fire({ title: 'Berhasil!', text: result.message, icon: 'success', timer: 2000, showConfirmButton: false });
+        setShowModalBarang(false);
+        setFormBarang({ nama: '', batas_km: '', stok: '', harga: '', tanggal: '' }); fetchData();
+      } else Swal.fire('Gagal!', result.message, 'error');
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
+    setProsesLoading(false);
+  };
+
+  const handleUpdateBarang = async (e) => {
+    e.preventDefault(); setProsesLoading(true);
+    const username = localStorage.getItem('sas_user');
+    try {
+      const response = await fetch('/api/sas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "EDIT_BARANG", ...editBarang, username })
+      });
+      const result = await response.json();
+      if (result.success) { 
+        Swal.fire({ title: 'Tersimpan!', text: result.message, icon: 'success', timer: 1500, showConfirmButton: false });
+        setShowEditBarang(false); fetchData(); 
+      } else Swal.fire('Gagal!', result.message, 'error');
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
+    setProsesLoading(false);
+  };
+
+  const handleHapusBarang = async (id) => {
+    // Pop-up Konfirmasi Hapus yang Elegan
+    const confirmBox = await Swal.fire({
+      title: 'Yakin buang ke Arsip?',
+      text: `Barang ${id} akan disembunyikan dari sistem utama!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ff4d4f',
+      cancelButtonColor: '#888',
+      confirmButtonText: 'Ya, Buang!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (confirmBox.isConfirmed) {
+      const username = localStorage.getItem('sas_user');
+      try {
+        const response = await fetch('/api/sas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: "HAPUS_BARANG", id, username })
+        });
+        const result = await response.json();
+        if (result.success) {
+          Swal.fire('Dihapus!', 'Data telah dipindahkan ke Arsip.', 'success');
+          fetchData();
+        } else {
+          Swal.fire('Gagal!', result.message, 'error');
+        }
+      } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
+    }
+  };
+
+  if (loading) return <div style={{ padding: '20px' }}><h3>Memuat Data Gudang... ⏳</h3></div>;
+
+  return (
+    <div>
+      <h1 style={{ color: '#1798D1', marginBottom: '20px' }}>📦 Master Data</h1>
+
+      {/* ---------------- TRUK ---------------- */}
+      <div className="table-container">
+        <div className="header-table">
+          <h3>Daftar Armada Truk</h3>
+          {role === 'Manager' && <button className="btn-add" onClick={() => setShowModalTruk(true)}>+ Tambah Truk</button>}
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr><th>ID</th><th>Nama Truk</th><th>Plat Nomor</th><th>Sopir</th><th>Odo Terakhir</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            {dataTruk.map((truk) => (
+              <tr key={truk.id}>
+                <td>{truk.id}</td><td><strong>{truk.nama}</strong></td><td>{truk.plat}</td><td>{truk.sopir}</td><td>{truk.odo.toLocaleString('id-ID')} KM</td>
+                <td>
+                  {role === 'Manager' ? (
+                    <div style={{display:'flex', gap:'5px'}}>
+                      <button onClick={() => { setEditTruk(truk); setShowEditTruk(true); }} style={{background:'#F38C36', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>✏️ Edit</button>
+                      <button onClick={() => handleHapusTruk(truk.id)} style={{background:'#ff4d4f', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>🗑️ Hapus</button>
+                    </div>
+                  ) : <span style={{color:'#aaa', fontSize:'12px'}}>Dibatasi</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ---------------- BARANG ---------------- */}
+      <div className="table-container">
+        <div className="header-table">
+          <h3>Daftar Inventory Barang</h3>
+          {role === 'Manager' && <button className="btn-add" onClick={() => setShowModalBarang(true)}>+ Tambah Barang</button>}
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr><th>ID</th><th>Nama Barang</th><th>Batas KM</th><th>Stok</th><th>Harga Satuan</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            {dataBarang.map((barang) => (
+              <tr key={barang.id}>
+                <td>{barang.id}</td><td><strong>{barang.nama}</strong></td>
+                <td>{barang.batas_km > 0 ? `${barang.batas_km.toLocaleString('id-ID')} KM` : '-'}</td>
+                <td><span style={{ color: barang.stok <= 5 ? 'red' : 'green', fontWeight: 'bold' }}>{barang.stok}</span></td>
+                <td>Rp {barang.harga.toLocaleString('id-ID')}</td>
+                <td>
+                  {role === 'Manager' ? (
+                    <div style={{display:'flex', gap:'5px'}}>
+                      <button onClick={() => { setEditBarang(barang); setShowEditBarang(true); }} style={{background:'#F38C36', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>✏️ Edit</button>
+                      <button onClick={() => handleHapusBarang(barang.id)} style={{background:'#ff4d4f', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>🗑️ Hapus</button>
+                    </div>
+                  ) : <span style={{color:'#aaa', fontSize:'12px'}}>Dibatasi</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ================= MODAL TAMBAH ================= */}
+      {showModalTruk && (
+        <div className="modal-overlay"><div className="modal-content"><h3>Tambah Armada Truk</h3>
+          <form onSubmit={handleSimpanTruk}>
+            <div className="form-group"><label>Nama Truk</label><input type="text" required value={formTruk.nama} onChange={e => setFormTruk({...formTruk, nama: e.target.value})} /></div>
+            <div className="form-group"><label>Plat Nomor</label><input type="text" required value={formTruk.plat} onChange={e => setFormTruk({...formTruk, plat: e.target.value})} /></div>
+            <div className="form-group"><label>Sopir</label><input type="text" required value={formTruk.sopir} onChange={e => setFormTruk({...formTruk, sopir: e.target.value})} /></div>
+            <div className="form-group"><label>Odo Awal</label><input type="number" required value={formTruk.odo} onChange={e => setFormTruk({...formTruk, odo: e.target.value})} /></div>
+            <div className="modal-actions">
+              <button type="button" className="btn-close" onClick={() => setShowModalTruk(false)}>Batal</button>
+              <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto'}}>Simpan</button>
+            </div>
+          </form>
+        </div></div>
+      )}
+
+      {showModalBarang && (
+        <div className="modal-overlay"><div className="modal-content"><h3>Tambah Barang</h3>
+          <form onSubmit={handleSimpanBarang}>
+            <div className="form-group"><label>Nama Barang</label><input type="text" required value={formBarang.nama} onChange={e => setFormBarang({...formBarang, nama: e.target.value})} /></div>
+            <div className="form-group"><label>Batas KM (0 = tidak ada)</label><input type="number" required value={formBarang.batas_km} onChange={e => setFormBarang({...formBarang, batas_km: e.target.value})} /></div>
+            <div className="form-group"><label>Stok Awal</label><input type="number" required value={formBarang.stok} onChange={e => setFormBarang({...formBarang, stok: e.target.value})} /></div>
+            <div className="form-group"><label>Harga Satuan (Rp)</label><input type="number" required value={formBarang.harga} onChange={e => setFormBarang({...formBarang, harga: e.target.value})} /></div>
+            <div className="form-group"><label>Tanggal Masuk</label><input type="date" required value={formBarang.tanggal} onChange={e => setFormBarang({...formBarang, tanggal: e.target.value})} /></div>
+            <div className="modal-actions">
+              <button type="button" className="btn-close" onClick={() => setShowModalBarang(false)}>Batal</button>
+              <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto'}}>Simpan</button>
+            </div>
+          </form>
+        </div></div>
+      )}
+
+      {/* ================= MODAL EDIT TRUK ================= */}
+      {showEditTruk && (
+        <div className="modal-overlay"><div className="modal-content">
+          <h3 style={{color:'#F38C36'}}>✏️ Edit Armada Truk</h3>
+          <form onSubmit={handleUpdateTruk}>
+            <div className="form-group"><label>Nama Truk</label><input type="text" required value={editTruk.nama} onChange={e => setEditTruk({...editTruk, nama: e.target.value})} /></div>
+            <div className="form-group"><label>Plat Nomor</label><input type="text" required value={editTruk.plat} onChange={e => setEditTruk({...editTruk, plat: e.target.value})} /></div>
+            <div className="form-group"><label>Sopir</label><input type="text" required value={editTruk.sopir} onChange={e => setEditTruk({...editTruk, sopir: e.target.value})} /></div>
+            <div className="form-group"><label>Odometer</label><input type="number" required value={editTruk.odo} onChange={e => setEditTruk({...editTruk, odo: e.target.value})} /></div>
+            <div className="modal-actions">
+              <button type="button" className="btn-close" onClick={() => setShowEditTruk(false)}>Batal</button>
+              <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto', background:'#F38C36'}}>Update Truk</button>
+            </div>
+          </form>
+        </div></div>
+      )}
+
+      {/* ================= MODAL EDIT BARANG ================= */}
+      {showEditBarang && (
+        <div className="modal-overlay"><div className="modal-content">
+          <h3 style={{color:'#F38C36'}}>✏️ Edit Barang</h3>
+          <form onSubmit={handleUpdateBarang}>
+            <div className="form-group"><label>Nama Barang</label><input type="text" required value={editBarang.nama} onChange={e => setEditBarang({...editBarang, nama: e.target.value})} /></div>
+            <div className="form-group"><label>Batas KM</label><input type="number" required value={editBarang.batas_km} onChange={e => setEditBarang({...editBarang, batas_km: e.target.value})} /></div>
+            <div className="form-group"><label>Stok Saat Ini</label><input type="number" required value={editBarang.stok} onChange={e => setEditBarang({...editBarang, stok: e.target.value})} /></div>
+            <div className="form-group"><label>Harga Satuan (Rp)</label><input type="number" required value={editBarang.harga} onChange={e => setEditBarang({...editBarang, harga: e.target.value})} /></div>
+            <div className="modal-actions">
+              <button type="button" className="btn-close" onClick={() => setShowEditBarang(false)}>Batal</button>
+              <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto', background:'#F38C36'}}>Update Barang</button>
+            </div>
+          </form>
+        </div></div>
+      )}
+
+    </div>
+  );
+}
