@@ -29,7 +29,7 @@ export default function ArsipPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // FUNGSI RESTORE TRUK
+  // ================= TRUK =================
   const handleRestoreTruk = async (idTruk, namaTruk) => {
     Swal.fire({
       title: 'Pulihkan Truk?',
@@ -54,14 +54,11 @@ export default function ArsipPage() {
           } else {
             Swal.fire('Gagal!', res.message, 'error');
           }
-        } catch (error) { 
-          Swal.fire('Error!', 'Sistem Error saat memulihkan', 'error'); 
-        }
+        } catch (error) { Swal.fire('Error!', 'Sistem Error saat memulihkan', 'error'); }
       }
     });
   };
 
-  // FUNGSI HAPUS PERMANEN TRUK (CASCADE DELETE)
   const handleHapusPermanenTruk = async (idTruk, namaTruk) => {
     Swal.fire({
       title: 'PERINGATAN BAHAYA!',
@@ -75,29 +72,24 @@ export default function ArsipPage() {
       if (result.isConfirmed) {
         const username = localStorage.getItem('sas_user');
         try {
-          // Menampilkan loading Swal
           Swal.fire({ title: 'Memusnahkan Data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-          
           const response = await fetch('/api/sas', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: "HAPUS_TRUK_PERMANEN", idTruk: idTruk, username })
           });
           const res = await response.json();
-          
           if (res.success) {
             Swal.fire('Terhapus!', res.message, 'success');
             fetchData();
           } else {
             Swal.fire('Gagal!', res.message, 'error');
           }
-        } catch (error) { 
-          Swal.fire('Error!', 'Sistem Error saat menghapus permanen', 'error'); 
-        }
+        } catch (error) { Swal.fire('Error!', 'Sistem Error saat menghapus permanen', 'error'); }
       }
     });
   };
 
-  // FUNGSI RESTORE BARANG
+  // ================= BARANG =================
   const handleRestoreBarang = async (idBarang, namaBarang) => {
     Swal.fire({
       title: 'Pulihkan Barang?',
@@ -122,9 +114,37 @@ export default function ArsipPage() {
           } else {
             Swal.fire('Gagal!', res.message, 'error');
           }
-        } catch (error) { 
-          Swal.fire('Error!', 'Sistem Error saat memulihkan', 'error'); 
-        }
+        } catch (error) { Swal.fire('Error!', 'Sistem Error saat memulihkan', 'error'); }
+      }
+    });
+  };
+
+  const handleHapusPermanenBarang = async (idBarang, namaBarang) => {
+    Swal.fire({
+      title: 'PERINGATAN BAHAYA!',
+      html: `Anda akan memusnahkan <b>${namaBarang}</b> (ID: ${idBarang}) secara PERMANEN beserta <b>SELURUH RIWAYAT TRANSAKSINYA</b>.<br><br>Data ini tidak bisa dikembalikan lagi!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Ya, Musnahkan Total!'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const username = localStorage.getItem('sas_user');
+        try {
+          Swal.fire({ title: 'Memusnahkan Data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+          const response = await fetch('/api/sas', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: "HAPUS_BARANG_PERMANEN", idBarang: idBarang, username })
+          });
+          const res = await response.json();
+          if (res.success) {
+            Swal.fire('Terhapus!', res.message, 'success');
+            fetchData();
+          } else {
+            Swal.fire('Gagal!', res.message, 'error');
+          }
+        } catch (error) { Swal.fire('Error!', 'Sistem Error saat menghapus permanen', 'error'); }
       }
     });
   };
@@ -164,7 +184,10 @@ export default function ArsipPage() {
             {arsipBarang.length > 0 ? arsipBarang.map(b => (
               <tr key={b.id}>
                 <td>{b.id}</td><td><strong>{b.nama}</strong></td><td>Rp {b.harga.toLocaleString('id-ID')}</td><td>{b.stok}</td>
-                <td><button onClick={() => handleRestoreBarang(b.id, b.nama)} style={{background:'#05CD99', color:'#fff', border:'none', padding:'8px 12px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>♻️ Pulihkan</button></td>
+                <td>
+                  <button onClick={() => handleRestoreBarang(b.id, b.nama)} style={{background:'#05CD99', color:'#fff', border:'none', padding:'8px 12px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold', marginRight: '10px'}}>♻️ Pulihkan</button>
+                  <button onClick={() => handleHapusPermanenBarang(b.id, b.nama)} style={{background:'#ef4444', color:'#fff', border:'none', padding:'8px 12px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>🔥 Hapus Permanen</button>
+                </td>
               </tr>
             )) : <tr><td colSpan="5" style={{textAlign:'center'}}>Tong sampah barang kosong.</td></tr>}
           </tbody>
