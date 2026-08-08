@@ -41,6 +41,24 @@ export default function ArsipPage() {
     } catch (error) { alert("Sistem Error"); }
   };
 
+  // FUNGSI BARU: Hapus Permanen Truk & Riwayatnya
+  const handleHapusPermanenTruk = async (idTruk, namaTruk) => {
+    // Peringatan ganda karena ini tindakan fatal
+    if (!confirm(`PERINGATAN BAHAYA!\n\nAnda akan memusnahkan ${namaTruk} (ID: ${idTruk}) secara PERMANEN beserta SELURUH RIWAYAT TRANSAKSINYA.\n\nApakah Anda benar-benar yakin ingin menghapus data ini selamanya?`)) return;
+    
+    const username = localStorage.getItem('sas_user');
+    try {
+      const response = await fetch('/api/sas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "HAPUS_TRUK_PERMANEN", idTruk: idTruk, username })
+      });
+      const result = await response.json();
+      alert(result.message);
+      if (result.success) fetchData(); // Refresh data untuk menghilangkan baris dari tabel
+    } catch (error) { alert("Sistem Error saat menghapus permanen"); }
+  };
+
   const handleRestoreBarang = async (idBarang) => {
     if (!confirm(`Pulihkan Barang ${idBarang} kembali ke Master Data?`)) return;
     const username = localStorage.getItem('sas_user');
@@ -72,7 +90,11 @@ export default function ArsipPage() {
             {arsipTruk.length > 0 ? arsipTruk.map(t => (
               <tr key={t.id}>
                 <td>{t.id}</td><td><strong>{t.nama}</strong></td><td>{t.plat}</td><td>{t.sopir}</td>
-                <td><button onClick={() => handleRestoreTruk(t.id)} style={{background:'#05CD99', color:'#fff', border:'none', padding:'8px 12px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>♻️ Pulihkan</button></td>
+                <td>
+                  <button onClick={() => handleRestoreTruk(t.id)} style={{background:'#05CD99', color:'#fff', border:'none', padding:'8px 12px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold', marginRight: '10px'}}>♻️ Pulihkan</button>
+                  {/* TOMBOL BARU: HAPUS PERMANEN */}
+                  <button onClick={() => handleHapusPermanenTruk(t.id, t.nama)} style={{background:'#ef4444', color:'#fff', border:'none', padding:'8px 12px', borderRadius:'5px', cursor:'pointer', fontWeight:'bold'}}>🔥 Hapus Permanen</button>
+                </td>
               </tr>
             )) : <tr><td colSpan="5" style={{textAlign:'center'}}>Tong sampah truk kosong.</td></tr>}
           </tbody>
