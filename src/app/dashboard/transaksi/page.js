@@ -53,9 +53,14 @@ export default function TransaksiPage() {
     setProsesLoading(true);
     try {
       const username = localStorage.getItem('sas_user');
+      
+      // PERUBAHAN 1: Memastikan angka desimal (koma/titik) terbaca dengan benar
+      const qtyFinal = parseFloat(formMasuk.qty.toString().replace(',', '.'));
+
       const response = await fetch('/api/sas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "BARANG_MASUK", ...formMasuk, username })
+        // qtyFinal menimpa qty lama yang berupa teks
+        body: JSON.stringify({ action: "BARANG_MASUK", ...formMasuk, qty: qtyFinal, username })
       });
       const result = await response.json();
       if (result.success) {
@@ -83,6 +88,9 @@ export default function TransaksiPage() {
     try {
       const username = localStorage.getItem('sas_user');
       
+      // PERUBAHAN 2: Memastikan angka desimal terbaca dengan benar untuk Barang Keluar
+      const qtyFinal = parseFloat(formKeluar.qty.toString().replace(',', '.'));
+
       // Proses konversi Foto Barang
       let fileData = null;
       if (fileFoto) {
@@ -99,7 +107,7 @@ export default function TransaksiPage() {
       
       const response = await fetch('/api/sas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "TRANSAKSI_KELUAR", ...formKeluar, fileData, fileDataOdo, username })
+        body: JSON.stringify({ action: "TRANSAKSI_KELUAR", ...formKeluar, qty: qtyFinal, fileData, fileDataOdo, username })
       });
       const result = await response.json();
       
@@ -134,9 +142,13 @@ export default function TransaksiPage() {
     setProsesLoading(true);
     try {
       const username = localStorage.getItem('sas_user');
+      
+      // PERUBAHAN 3: Memastikan stok fisik bisa menerima nilai desimal
+      const stokFisikFinal = parseFloat(formOpname.stokFisik.toString().replace(',', '.'));
+
       const response = await fetch('/api/sas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "OPNAME", idBarang: formOpname.idBarang, stokFisik: formOpname.stokFisik, keterangan: formOpname.keterangan, username })
+        body: JSON.stringify({ action: "OPNAME", idBarang: formOpname.idBarang, stokFisik: stokFisikFinal, keterangan: formOpname.keterangan, username })
       });
       const result = await response.json();
       if (result.success) {
@@ -185,7 +197,8 @@ export default function TransaksiPage() {
                 {dataBarang.map(b => ( <option key={b.id} value={b.id}>{b.nama} (Stok: {b.stok})</option> ))}
               </select>
             </div>
-            <div className="form-group"><label>Jumlah Masuk (Qty)</label><input type="number" required min="1" value={formMasuk.qty} onChange={(e) => setFormMasuk({...formMasuk, qty: e.target.value})} placeholder="0" /></div>
+            {/* PERUBAHAN 4: Tambah step="any" dan min="0.01" */}
+            <div className="form-group"><label>Jumlah Masuk (Qty)</label><input type="number" required step="any" min="0.01" value={formMasuk.qty} onChange={(e) => setFormMasuk({...formMasuk, qty: e.target.value})} placeholder="0" /></div>
             <div className="form-group"><label>Tanggal Pembelian/Masuk</label><input type="date" required value={formMasuk.tanggal} onChange={(e) => setFormMasuk({...formMasuk, tanggal: e.target.value})} /></div>
             <button type="submit" className="btn-submit" disabled={prosesLoading}>{prosesLoading ? "Memproses..." : "Simpan Barang Masuk"}</button>
           </form>
@@ -227,7 +240,8 @@ export default function TransaksiPage() {
               </select>
             </div>
             
-            <div className="form-group"><label>Jumlah Keluar (Qty)</label><input type="number" required min="1" value={formKeluar.qty} onChange={(e) => setFormKeluar({...formKeluar, qty: e.target.value})} placeholder="0" /></div>
+            {/* PERUBAHAN 5: Tambah step="any" dan min="0.01" */}
+            <div className="form-group"><label>Jumlah Keluar (Qty)</label><input type="number" required step="any" min="0.01" value={formKeluar.qty} onChange={(e) => setFormKeluar({...formKeluar, qty: e.target.value})} placeholder="0" /></div>
             
             <div className="form-group">
               <label>Odometer Truk Saat Ini (KM)</label>
@@ -276,7 +290,8 @@ export default function TransaksiPage() {
               </select>
             </div>
             <div className="form-group"><label>Stok di Sistem Saat Ini</label><input type="number" readOnly value={formOpname.stokSistem} style={{ backgroundColor: '#f0f0f0', color: '#888', fontWeight: 'bold', cursor: 'not-allowed' }} placeholder="Pilih barang terlebih dahulu" /></div>
-            <div className="form-group"><label>Stok Fisik Aktual (Nyata)</label><input type="number" required min="0" value={formOpname.stokFisik} onChange={(e) => setFormOpname({...formOpname, stokFisik: e.target.value})} placeholder="Masukkan jumlah yang ada di gudang" /></div>
+            {/* PERUBAHAN 6: Tambah step="any" */}
+            <div className="form-group"><label>Stok Fisik Aktual (Nyata)</label><input type="number" required step="any" min="0" value={formOpname.stokFisik} onChange={(e) => setFormOpname({...formOpname, stokFisik: e.target.value})} placeholder="Masukkan jumlah yang ada di gudang" /></div>
             <div className="form-group"><label>Keterangan / Alasan Selisih</label><input type="text" required value={formOpname.keterangan} onChange={(e) => setFormOpname({...formOpname, keterangan: e.target.value})} placeholder="Contoh: Barang hilang, rusak, atau salah hitung" /></div>
             <button type="submit" className="btn-submit" disabled={prosesLoading} style={{ backgroundColor: '#05CD99' }}>{prosesLoading ? "Memproses..." : "Sesuaikan Stok"}</button>
           </form>
