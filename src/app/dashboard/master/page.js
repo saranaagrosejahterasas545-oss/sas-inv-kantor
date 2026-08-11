@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Swal from 'sweetalert2'; // 👈 Import SweetAlert2
+import Swal from 'sweetalert2';
 
 export default function MasterDataPage() {
   const [role, setRole] = useState('');
@@ -83,7 +83,6 @@ export default function MasterDataPage() {
   };
 
   const handleHapusTruk = async (id) => {
-    // Pop-up Konfirmasi Hapus yang Elegan
     const confirmBox = await Swal.fire({
       title: 'Yakin buang ke Arsip?',
       text: `Truk ${id} akan disembunyikan dari sistem utama!`,
@@ -117,10 +116,14 @@ export default function MasterDataPage() {
   const handleSimpanBarang = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
+    
+    // PEMBERSIH TITIK: Ubah "100.000" kembali menjadi 100000 sebelum dikirim ke server
+    const hargaBersih = parseInt(String(formBarang.harga).replace(/\./g, ''), 10) || 0;
+
     try {
       const response = await fetch('/api/sas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "TAMBAH_BARANG", ...formBarang, username })
+        body: JSON.stringify({ action: "TAMBAH_BARANG", ...formBarang, harga: hargaBersih, username })
       });
       const result = await response.json();
       if (result.success) {
@@ -135,10 +138,14 @@ export default function MasterDataPage() {
   const handleUpdateBarang = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
+    
+    // PEMBERSIH TITIK: Ubah "100.000" kembali menjadi 100000 sebelum dikirim ke server
+    const hargaBersih = parseInt(String(editBarang.harga).replace(/\./g, ''), 10) || 0;
+
     try {
       const response = await fetch('/api/sas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "EDIT_BARANG", ...editBarang, username })
+        body: JSON.stringify({ action: "EDIT_BARANG", ...editBarang, harga: hargaBersih, username })
       });
       const result = await response.json();
       if (result.success) { 
@@ -150,7 +157,6 @@ export default function MasterDataPage() {
   };
 
   const handleHapusBarang = async (id) => {
-    // Pop-up Konfirmasi Hapus yang Elegan
     const confirmBox = await Swal.fire({
       title: 'Yakin buang ke Arsip?',
       text: `Barang ${id} akan disembunyikan dari sistem utama!`,
@@ -234,7 +240,16 @@ export default function MasterDataPage() {
                 <td>
                   {role === 'Manager' ? (
                     <div style={{display:'flex', gap:'5px'}}>
-                      <button onClick={() => { setEditBarang(barang); setShowEditBarang(true); }} style={{background:'#F38C36', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>✏️ Edit</button>
+                      <button 
+                        onClick={() => { 
+                          // Pasang titik otomatis saat tombol Edit diklik
+                          setEditBarang({
+                            ...barang,
+                            harga: barang.harga ? barang.harga.toLocaleString('id-ID') : ''
+                          }); 
+                          setShowEditBarang(true); 
+                        }} 
+                        style={{background:'#F38C36', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>✏️ Edit</button>
                       <button onClick={() => handleHapusBarang(barang.id)} style={{background:'#ff4d4f', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>🗑️ Hapus</button>
                     </div>
                   ) : <span style={{color:'#aaa', fontSize:'12px'}}>Dibatasi</span>}
@@ -245,7 +260,7 @@ export default function MasterDataPage() {
         </table>
       </div>
 
-      {/* ================= MODAL TAMBAH ================= */}
+      {/* ================= MODAL TAMBAH TRUK ================= */}
       {showModalTruk && (
         <div className="modal-overlay"><div className="modal-content"><h3>Tambah Armada Truk</h3>
           <form onSubmit={handleSimpanTruk}>
@@ -261,13 +276,30 @@ export default function MasterDataPage() {
         </div></div>
       )}
 
+      {/* ================= MODAL TAMBAH BARANG ================= */}
       {showModalBarang && (
         <div className="modal-overlay"><div className="modal-content"><h3>Tambah Barang</h3>
           <form onSubmit={handleSimpanBarang}>
             <div className="form-group"><label>Nama Barang</label><input type="text" required value={formBarang.nama} onChange={e => setFormBarang({...formBarang, nama: e.target.value})} /></div>
             <div className="form-group"><label>Batas KM (0 = tidak ada)</label><input type="number" required value={formBarang.batas_km} onChange={e => setFormBarang({...formBarang, batas_km: e.target.value})} /></div>
             <div className="form-group"><label>Stok Awal</label><input type="number" required value={formBarang.stok} onChange={e => setFormBarang({...formBarang, stok: e.target.value})} /></div>
-            <div className="form-group"><label>Harga Satuan (Rp)</label><input type="number" required value={formBarang.harga} onChange={e => setFormBarang({...formBarang, harga: e.target.value})} /></div>
+            
+            {/* SIHIR FORMAT RUPIAH DI SINI */}
+            <div className="form-group">
+              <label>Harga Satuan (Rp)</label>
+              <input 
+                type="text" 
+                required 
+                placeholder="Contoh: 150.000"
+                value={formBarang.harga} 
+                onChange={e => {
+                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                  const formattedValue = rawValue ? parseInt(rawValue, 10).toLocaleString('id-ID') : '';
+                  setFormBarang({...formBarang, harga: formattedValue});
+                }} 
+              />
+            </div>
+
             <div className="form-group"><label>Tanggal Masuk</label><input type="date" required value={formBarang.tanggal} onChange={e => setFormBarang({...formBarang, tanggal: e.target.value})} /></div>
             <div className="modal-actions">
               <button type="button" className="btn-close" onClick={() => setShowModalBarang(false)}>Batal</button>
@@ -302,7 +334,22 @@ export default function MasterDataPage() {
             <div className="form-group"><label>Nama Barang</label><input type="text" required value={editBarang.nama} onChange={e => setEditBarang({...editBarang, nama: e.target.value})} /></div>
             <div className="form-group"><label>Batas KM</label><input type="number" required value={editBarang.batas_km} onChange={e => setEditBarang({...editBarang, batas_km: e.target.value})} /></div>
             <div className="form-group"><label>Stok Saat Ini</label><input type="number" required value={editBarang.stok} onChange={e => setEditBarang({...editBarang, stok: e.target.value})} /></div>
-            <div className="form-group"><label>Harga Satuan (Rp)</label><input type="number" required value={editBarang.harga} onChange={e => setEditBarang({...editBarang, harga: e.target.value})} /></div>
+            
+            {/* SIHIR FORMAT RUPIAH DI SINI */}
+            <div className="form-group">
+              <label>Harga Satuan (Rp)</label>
+              <input 
+                type="text" 
+                required 
+                value={editBarang.harga} 
+                onChange={e => {
+                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                  const formattedValue = rawValue ? parseInt(rawValue, 10).toLocaleString('id-ID') : '';
+                  setEditBarang({...editBarang, harga: formattedValue});
+                }} 
+              />
+            </div>
+
             <div className="modal-actions">
               <button type="button" className="btn-close" onClick={() => setShowEditBarang(false)}>Batal</button>
               <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto', background:'#F38C36'}}>Update Barang</button>
