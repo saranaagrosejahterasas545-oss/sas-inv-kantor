@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Swal from 'sweetalert2'; // Tambahan untuk pop-up konfirmasi
 
 export default function LaporanPage() {
   const [dataTransaksi, setDataTransaksi] = useState([]);
   const [dataBarang, setDataBarang] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState(''); // Tambahan untuk mengecek siapa yang login
 
   // State untuk Filter & Mode Tampilan
   const [modeTampilan, setModeTampilan] = useState('transaksi'); // 'transaksi' atau 'rekap'
@@ -36,12 +38,52 @@ export default function LaporanPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    setRole(localStorage.getItem('sas_role') || '');
+    fetchData(); 
+  }, []);
 
   // Kembalikan ke halaman 1 setiap kali filter atau mode diubah
   useEffect(() => {
     setCurrentPage(1);
   }, [filterWaktu, filterBulan, filterJenis, modeTampilan]);
+
+  // ================= LOGIKA BATALKAN TRANSAKSI (ROLLBACK) =================
+  const handleBatalkanTransaksi = async (idTrx) => {
+    const confirmBox = await Swal.fire({
+      title: 'Batalkan Transaksi?',
+      html: `Yakin ingin membatalkan transaksi <b>${idTrx}</b>?<br>Stok gudang akan otomatis disesuaikan kembali (Rollback).`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ff4d4f',
+      cancelButtonColor: '#888',
+      confirmButtonText: 'Ya, Batalkan!',
+      cancelButtonText: 'Tutup'
+    });
+
+    if (confirmBox.isConfirmed) {
+      setLoading(true);
+      const username = localStorage.getItem('sas_user');
+      try {
+        const response = await fetch('/api/sas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: "HAPUS_TRANSAKSI", id: idTrx, username })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          Swal.fire('Dibatalkan!', result.message, 'success');
+          fetchData(); // Refresh data agar tabel dan stok ter-update
+        } else {
+          Swal.fire('Gagal!', result.message, 'error');
+        }
+      } catch (error) {
+        Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error');
+      }
+      setLoading(false);
+    }
+  };
 
   // ================= LOGIKA FILTER DATA =================
   const filteredData = dataTransaksi.filter(trx => {
@@ -282,7 +324,16 @@ export default function LaporanPage() {
         {modeTampilan === 'transaksi' ? (
           <table className="data-table">
             <thead>
-              <tr><th>Kode Trx</th><th>Tanggal</th><th>Tujuan/Asal</th><th>Detail Barang (Qty)</th><th>KM Servis & Target</th><th>Total Biaya (Rp)</th><th className="print-hide">Bukti</th></tr>
+              <tr>
+                <th>Kode Trx</th>
+                <th>Tanggal</th>
+                <th>Tujuan/Asal</th>
+                <th>Detail Barang (Qty)</th>
+                <th>KM Servis & Target</th>
+                <th>Total Biaya (Rp)</th>
+                <th className="print-hide">Bukti</th>
+                <th className="print-hide">Aksi</th> {/* TAMBAHAN KOLOM AKSI */}
+              </tr>
             </thead>
             <tbody>
               {currentItems.length > 0 ? currentItems.map((trx, index) => {
@@ -293,10 +344,14 @@ export default function LaporanPage() {
 
                   return (
                     <tr key={index}>
-                      <td><span style={{ display: 'block', fontSize: '11px', color: '#888' }}>{trx.id}</span><span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', color: badgeColor, backgroundColor: badgeBg, marginTop: '5px' }}>{trx.jenis}</span></td>
-                      <td>{trx.waktu_str}</td><td>{trx.truk_nama}</td><td><strong>{trx.barang_nama}</strong></td>
+                      <td>
+                        <span style={{ display: 'block', fontSize: '11px', color: '#888' }}>{trx.id}</span>
+                        <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', color: badgeColor, backgroundColor: badgeBg, marginTop: '5px' }}>{trx.jenis}</span>
+                      </td>
+                      <td>{trx.waktu_str}</td>
+                      <td>{trx.truk_nama}</td>
+                      <td><strong>{trx.barang_nama}</strong></td>
                       
-                      {/* FITUR BARU: Menampilkan Estimasi ODO di Tabel */}
                       <td>
                         {trx.odo !== "-" ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -318,10 +373,38 @@ export default function LaporanPage() {
                       </td>
                       
                       <td style={{ fontWeight: 'bold', color: '#444' }}>{trx.total_biaya.toLocaleString('id-ID')}</td>
-                      <td className="print-hide">{trx.foto_url !== "-" ? ( <a href={trx.foto_url} target="_blank" rel="noopener noreferrer" style={{ background: '#e3f2fd', color: '#1798D1', padding: '5px 10px', borderRadius: '5px', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold' }}>🖼️ Lihat</a>) : <span style={{ color: '#aaa' }}>-</span>}</td>
+                      
+                      <td className="print-hide">
+                        {trx.foto_url !== "-" ? ( 
+                          <a href={trx.foto_url} target="_blank" rel="noopener noreferrer" style={{ background: '#e3f2fd', color: '#1798D1', padding: '5px 10px', borderRadius: '5px', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold' }}>🖼️ Lihat</a>
+                        ) : <span style={{ color: '#aaa' }}>-</span>}
+                      </td>
+
+                      {/* TOMBOL BATALKAN TRANSAKSI */}
+                      <td className="print-hide">
+                        <button 
+                          onClick={() => handleBatalkanTransaksi(trx.id)} 
+                          style={{ 
+                            background: '#ff4d4f', 
+                            color: '#fff', 
+                            border: 'none', 
+                            padding: '6px 12px', 
+                            borderRadius: '5px', 
+                            cursor: 'pointer', 
+                            fontSize: '12px', 
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          ❌ Batal
+                        </button>
+                      </td>
+
                     </tr>
                   );
-                }) : ( <tr><td colSpan="7" style={{textAlign: 'center'}}>Tidak ada data transaksi.</td></tr> )}
+                }) : ( <tr><td colSpan="8" style={{textAlign: 'center'}}>Tidak ada data transaksi.</td></tr> )}
             </tbody>
           </table>
         ) : (

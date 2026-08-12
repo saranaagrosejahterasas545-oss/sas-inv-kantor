@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Swal from 'sweetalert2'; // Tambahan untuk pop-up konfirmasi
 
 export default function BukuServisPage() {
   const [dataTruk, setDataTruk] = useState([]);
@@ -33,6 +34,43 @@ export default function BukuServisPage() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // ================= LOGIKA BATALKAN TRANSAKSI (ROLLBACK) =================
+  const handleBatalkanTransaksi = async (idTrx) => {
+    const confirmBox = await Swal.fire({
+      title: 'Batalkan Transaksi?',
+      html: `Yakin ingin membatalkan transaksi servis <b>${idTrx}</b>?<br>Stok sparepart akan dikembalikan ke gudang.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ff4d4f',
+      cancelButtonColor: '#888',
+      confirmButtonText: 'Ya, Batalkan!',
+      cancelButtonText: 'Tutup'
+    });
+
+    if (confirmBox.isConfirmed) {
+      setLoading(true);
+      const username = localStorage.getItem('sas_user');
+      try {
+        const response = await fetch('/api/sas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: "HAPUS_TRANSAKSI", id: idTrx, username })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+          Swal.fire('Dibatalkan!', result.message, 'success');
+          fetchData(); // Refresh data agar tabel dan stok ter-update
+        } else {
+          Swal.fire('Gagal!', result.message, 'error');
+        }
+      } catch (error) {
+        Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error');
+      }
+      setLoading(false);
+    }
+  };
 
   // ================= LOGIKA FILTER DATA =================
   const riwayatTampil = dataRiwayat.filter(trx => {
@@ -139,6 +177,7 @@ export default function BukuServisPage() {
               <th>Jumlah</th>
               <th>Odo Saat Ganti & Target</th>
               <th>Total Biaya</th>
+              <th className="print-hide">Aksi</th> {/* TAMBAHAN KOLOM AKSI */}
             </tr>
           </thead>
           <tbody>
@@ -171,10 +210,33 @@ export default function BukuServisPage() {
                   </td>
 
                   <td>Rp {trx.total_biaya.toLocaleString('id-ID')}</td>
+
+                  {/* TOMBOL BATALKAN TRANSAKSI */}
+                  <td className="print-hide">
+                    <button 
+                      onClick={() => handleBatalkanTransaksi(trx.id)} 
+                      style={{ 
+                        background: '#ff4d4f', 
+                        color: '#fff', 
+                        border: 'none', 
+                        padding: '6px 12px', 
+                        borderRadius: '5px', 
+                        cursor: 'pointer', 
+                        fontSize: '12px', 
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      ❌ Batal
+                    </button>
+                  </td>
+
                 </tr>
               ))
             ) : (
-              <tr><td colSpan={trukInfo ? "5" : "6"} style={{textAlign: 'center'}}>Tidak ada riwayat servis pada periode ini.</td></tr>
+              <tr><td colSpan={trukInfo ? "6" : "7"} style={{textAlign: 'center'}}>Tidak ada riwayat servis pada periode ini.</td></tr>
             )}
           </tbody>
         </table>
