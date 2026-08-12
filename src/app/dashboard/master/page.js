@@ -10,15 +10,15 @@ export default function MasterDataPage() {
   const [loading, setLoading] = useState(true);
   const [prosesLoading, setProsesLoading] = useState(false);
 
-  // State Modal Tambah
+  // State Modal Tambah (Ditambah 'merek')
   const [showModalTruk, setShowModalTruk] = useState(false);
-  const [formTruk, setFormTruk] = useState({ nama: '', plat: '', sopir: '', odo: '' });
+  const [formTruk, setFormTruk] = useState({ nama: '', plat: '', sopir: '', odo: '', merek: '' });
   const [showModalBarang, setShowModalBarang] = useState(false);
   const [formBarang, setFormBarang] = useState({ nama: '', batas_km: '', stok: '', harga: '', tanggal: '' });
 
-  // State Modal Edit
+  // State Modal Edit (Ditambah 'merek')
   const [showEditTruk, setShowEditTruk] = useState(false);
-  const [editTruk, setEditTruk] = useState({ id: '', nama: '', plat: '', sopir: '', odo: '' });
+  const [editTruk, setEditTruk] = useState({ id: '', nama: '', plat: '', sopir: '', odo: '', merek: '' });
   const [showEditBarang, setShowEditBarang] = useState(false);
   const [editBarang, setEditBarang] = useState({ id: '', nama: '', batas_km: '', stok: '', harga: '' });
 
@@ -46,7 +46,6 @@ export default function MasterDataPage() {
     setLoading(false);
   };
 
-  // ================= FUNGSI TRUK DENGAN SWEETALERT =================
   const handleSimpanTruk = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
@@ -59,7 +58,7 @@ export default function MasterDataPage() {
       if (result.success) {
         Swal.fire({ title: 'Berhasil!', text: result.message, icon: 'success', timer: 2000, showConfirmButton: false });
         setShowModalTruk(false);
-        setFormTruk({ nama: '', plat: '', sopir: '', odo: '' }); fetchData();
+        setFormTruk({ nama: '', plat: '', sopir: '', odo: '', merek: '' }); fetchData();
       } else Swal.fire('Gagal!', result.message, 'error');
     } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan jaringan.', 'error'); }
     setProsesLoading(false);
@@ -112,12 +111,9 @@ export default function MasterDataPage() {
     }
   };
 
-  // ================= FUNGSI BARANG DENGAN SWEETALERT =================
   const handleSimpanBarang = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
-    
-    // PEMBERSIH TITIK: Ubah "100.000" kembali menjadi 100000 sebelum dikirim ke server
     const hargaBersih = parseInt(String(formBarang.harga).replace(/\./g, ''), 10) || 0;
 
     try {
@@ -138,8 +134,6 @@ export default function MasterDataPage() {
   const handleUpdateBarang = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
-    
-    // PEMBERSIH TITIK: Ubah "100.000" kembali menjadi 100000 sebelum dikirim ke server
     const hargaBersih = parseInt(String(editBarang.harga).replace(/\./g, ''), 10) || 0;
 
     try {
@@ -200,12 +194,21 @@ export default function MasterDataPage() {
         </div>
         <table className="data-table">
           <thead>
-            <tr><th>ID</th><th>Nama Truk</th><th>Plat Nomor</th><th>Sopir</th><th>Odo Terakhir</th><th>Aksi</th></tr>
+            <tr><th>ID</th><th>Merek / Tipe</th><th>Nama Truk</th><th>Plat Nomor</th><th>Sopir</th><th>Odo Terakhir</th><th>Aksi</th></tr>
           </thead>
           <tbody>
             {dataTruk.map((truk) => (
               <tr key={truk.id}>
-                <td>{truk.id}</td><td><strong>{truk.nama}</strong></td><td>{truk.plat}</td><td>{truk.sopir}</td><td>{truk.odo.toLocaleString('id-ID')} KM</td>
+                <td>{truk.id}</td>
+                <td>
+                  <span style={{background: '#f1f5f9', color: '#334155', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold'}}>
+                    {truk.merek || '-'}
+                  </span>
+                </td>
+                <td><strong>{truk.nama}</strong></td>
+                <td>{truk.plat}</td>
+                <td>{truk.sopir}</td>
+                <td>{truk.odo.toLocaleString('id-ID')} KM</td>
                 <td>
                   {role === 'Manager' ? (
                     <div style={{display:'flex', gap:'5px'}}>
@@ -242,7 +245,6 @@ export default function MasterDataPage() {
                     <div style={{display:'flex', gap:'5px'}}>
                       <button 
                         onClick={() => { 
-                          // Pasang titik otomatis saat tombol Edit diklik
                           setEditBarang({
                             ...barang,
                             harga: barang.harga ? barang.harga.toLocaleString('id-ID') : ''
@@ -264,10 +266,24 @@ export default function MasterDataPage() {
       {showModalTruk && (
         <div className="modal-overlay"><div className="modal-content"><h3>Tambah Armada Truk</h3>
           <form onSubmit={handleSimpanTruk}>
-            <div className="form-group"><label>Nama Truk</label><input type="text" required value={formTruk.nama} onChange={e => setFormTruk({...formTruk, nama: e.target.value})} /></div>
+            
+            <div className="form-group">
+              <label>Merek / Tipe Armada</label>
+              <select required value={formTruk.merek} onChange={e => setFormTruk({...formTruk, merek: e.target.value})}>
+                <option value="" disabled>-- Pilih Merek --</option>
+                <option value="Mitsubishi Canter">Mitsubishi Canter</option>
+                <option value="Isuzu Elf">Isuzu Elf</option>
+                <option value="Isuzu Giga">Isuzu Giga</option>
+                <option value="Hino">Hino</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </div>
+
+            <div className="form-group"><label>Nama Truk / Julukan</label><input type="text" required value={formTruk.nama} onChange={e => setFormTruk({...formTruk, nama: e.target.value})} /></div>
             <div className="form-group"><label>Plat Nomor</label><input type="text" required value={formTruk.plat} onChange={e => setFormTruk({...formTruk, plat: e.target.value})} /></div>
-            <div className="form-group"><label>Sopir</label><input type="text" required value={formTruk.sopir} onChange={e => setFormTruk({...formTruk, sopir: e.target.value})} /></div>
+            <div className="form-group"><label>Sopir Utama</label><input type="text" required value={formTruk.sopir} onChange={e => setFormTruk({...formTruk, sopir: e.target.value})} /></div>
             <div className="form-group"><label>Odo Awal</label><input type="number" required value={formTruk.odo} onChange={e => setFormTruk({...formTruk, odo: e.target.value})} /></div>
+            
             <div className="modal-actions">
               <button type="button" className="btn-close" onClick={() => setShowModalTruk(false)}>Batal</button>
               <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto'}}>Simpan</button>
@@ -283,15 +299,9 @@ export default function MasterDataPage() {
             <div className="form-group"><label>Nama Barang</label><input type="text" required value={formBarang.nama} onChange={e => setFormBarang({...formBarang, nama: e.target.value})} /></div>
             <div className="form-group"><label>Batas KM (0 = tidak ada)</label><input type="number" required value={formBarang.batas_km} onChange={e => setFormBarang({...formBarang, batas_km: e.target.value})} /></div>
             <div className="form-group"><label>Stok Awal</label><input type="number" required value={formBarang.stok} onChange={e => setFormBarang({...formBarang, stok: e.target.value})} /></div>
-            
-            {/* SIHIR FORMAT RUPIAH DI SINI */}
             <div className="form-group">
               <label>Harga Satuan (Rp)</label>
-              <input 
-                type="text" 
-                required 
-                placeholder="Contoh: 150.000"
-                value={formBarang.harga} 
+              <input type="text" required placeholder="Contoh: 150.000" value={formBarang.harga} 
                 onChange={e => {
                   const rawValue = e.target.value.replace(/[^0-9]/g, '');
                   const formattedValue = rawValue ? parseInt(rawValue, 10).toLocaleString('id-ID') : '';
@@ -299,7 +309,6 @@ export default function MasterDataPage() {
                 }} 
               />
             </div>
-
             <div className="form-group"><label>Tanggal Masuk</label><input type="date" required value={formBarang.tanggal} onChange={e => setFormBarang({...formBarang, tanggal: e.target.value})} /></div>
             <div className="modal-actions">
               <button type="button" className="btn-close" onClick={() => setShowModalBarang(false)}>Batal</button>
@@ -314,6 +323,19 @@ export default function MasterDataPage() {
         <div className="modal-overlay"><div className="modal-content">
           <h3 style={{color:'#F38C36'}}>✏️ Edit Armada Truk</h3>
           <form onSubmit={handleUpdateTruk}>
+            
+            <div className="form-group">
+              <label>Merek / Tipe Armada</label>
+              <select required value={editTruk.merek || ''} onChange={e => setEditTruk({...editTruk, merek: e.target.value})}>
+                <option value="" disabled>-- Pilih Merek --</option>
+                <option value="Mitsubishi Canter">Mitsubishi Canter</option>
+                <option value="Isuzu Elf">Isuzu Elf</option>
+                <option value="Isuzu Giga">Isuzu Giga</option>
+                <option value="Hino">Hino</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </div>
+
             <div className="form-group"><label>Nama Truk</label><input type="text" required value={editTruk.nama} onChange={e => setEditTruk({...editTruk, nama: e.target.value})} /></div>
             <div className="form-group"><label>Plat Nomor</label><input type="text" required value={editTruk.plat} onChange={e => setEditTruk({...editTruk, plat: e.target.value})} /></div>
             <div className="form-group"><label>Sopir</label><input type="text" required value={editTruk.sopir} onChange={e => setEditTruk({...editTruk, sopir: e.target.value})} /></div>
@@ -334,14 +356,9 @@ export default function MasterDataPage() {
             <div className="form-group"><label>Nama Barang</label><input type="text" required value={editBarang.nama} onChange={e => setEditBarang({...editBarang, nama: e.target.value})} /></div>
             <div className="form-group"><label>Batas KM</label><input type="number" required value={editBarang.batas_km} onChange={e => setEditBarang({...editBarang, batas_km: e.target.value})} /></div>
             <div className="form-group"><label>Stok Saat Ini</label><input type="number" required value={editBarang.stok} onChange={e => setEditBarang({...editBarang, stok: e.target.value})} /></div>
-            
-            {/* SIHIR FORMAT RUPIAH DI SINI */}
             <div className="form-group">
               <label>Harga Satuan (Rp)</label>
-              <input 
-                type="text" 
-                required 
-                value={editBarang.harga} 
+              <input type="text" required value={editBarang.harga} 
                 onChange={e => {
                   const rawValue = e.target.value.replace(/[^0-9]/g, '');
                   const formattedValue = rawValue ? parseInt(rawValue, 10).toLocaleString('id-ID') : '';
@@ -349,7 +366,6 @@ export default function MasterDataPage() {
                 }} 
               />
             </div>
-
             <div className="modal-actions">
               <button type="button" className="btn-close" onClick={() => setShowEditBarang(false)}>Batal</button>
               <button type="submit" className="btn-submit" disabled={prosesLoading} style={{width:'auto', background:'#F38C36'}}>Update Barang</button>
