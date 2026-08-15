@@ -18,7 +18,9 @@ export default function TransaksiPage() {
   const [formOpname, setFormOpname] = useState({ idBarang: '', stokSistem: '', stokFisik: '', keterangan: '' });
   const [formJasa, setFormJasa] = useState({ idTruk: '', namaJasa: '', biaya: '', odo: '', tanggal: hariIni });
   
-  // STATE BARU: Live Search Filter untuk Dropdown
+  // STATE BARU: Form untuk Penjualan Barang Bekas (Pemasukan)
+  const [formJual, setFormJual] = useState({ namaBarang: '', nominal: '', keterangan: '', tanggal: hariIni });
+  
   const [searchMasuk, setSearchMasuk] = useState('');
   const [searchKeluarTruk, setSearchKeluarTruk] = useState('');
   const [searchKeluarBarang, setSearchKeluarBarang] = useState('');
@@ -40,7 +42,6 @@ export default function TransaksiPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // FILTERING LOGIC UNTUK DROPDOWN
   const filteredBarangMasuk = dataBarang.filter(b => b.nama.toLowerCase().includes(searchMasuk.toLowerCase()));
   const filteredTrukKeluar = dataTruk.filter(t => t.nama.toLowerCase().includes(searchKeluarTruk.toLowerCase()) || t.plat.toLowerCase().includes(searchKeluarTruk.toLowerCase()));
   const filteredBarangKeluar = dataBarang.filter(b => b.nama.toLowerCase().includes(searchKeluarBarang.toLowerCase()));
@@ -49,7 +50,7 @@ export default function TransaksiPage() {
 
   const toBase64 = (file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = error => reject(error); });
 
-  // ... (FUNGSI SUBMIT SAMA SEPERTI SEBELUMNYA) ...
+  // ================= SEMUA FUNGSI SUBMIT =================
   const handleMasuk = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     try {
@@ -100,6 +101,25 @@ export default function TransaksiPage() {
     } catch (error) { Swal.fire('Error!', 'Terjadi kesalahan sistem.', 'error'); } setProsesLoading(false);
   };
 
+  // FUNGSI BARU: PENJUALAN BARANG BEKAS
+  const handleJualBekas = async (e) => {
+    e.preventDefault(); setProsesLoading(true);
+    try {
+      const username = localStorage.getItem('sas_user'); 
+      const nominalBersih = parseInt(String(formJual.nominal).replace(/\./g, ''), 10) || 0;
+      
+      const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "PENJUALAN_BEKAS", ...formJual, nominal: nominalBersih, username }) });
+      const result = await response.json();
+      
+      if (result.success) { 
+        Swal.fire('Sukses!', result.message, 'success'); 
+        setFormJual({ namaBarang: '', nominal: '', keterangan: '', tanggal: hariIni }); 
+        fetchData(); 
+      } else Swal.fire('Gagal!', result.message, 'warning');
+    } catch (error) { Swal.fire('Error!', 'Terjadi kesalahan sistem.', 'error'); } 
+    setProsesLoading(false);
+  };
+
   const handlePilihBarangOpname = (e) => {
     const id = e.target.value; const barang = dataBarang.find(b => b.id === id); setFormOpname({ ...formOpname, idBarang: id, stokSistem: barang ? barang.stok : '' });
   };
@@ -117,6 +137,8 @@ export default function TransaksiPage() {
         <button className={`tab-btn ${tab === 'keluar' ? 'active' : ''}`} onClick={() => setTab('keluar')}>📤 Barang Keluar (Servis)</button>
         <button className={`tab-btn ${tab === 'opname' ? 'active' : ''}`} onClick={() => setTab('opname')} style={{ backgroundColor: tab === 'opname' ? '#05CD99' : '#e2e8f0', color: tab === 'opname' ? 'white' : '#64748b' }}>📋 Stock Opname</button>
         <button className={`tab-btn ${tab === 'jasa' ? 'active' : ''}`} onClick={() => setTab('jasa')} style={{ backgroundColor: tab === 'jasa' ? '#8b5cf6' : '#e2e8f0', color: tab === 'jasa' ? 'white' : '#64748b' }}>🛠️ Jasa Bengkel Luar</button>
+        {/* TAB BARU: PENJUALAN BARANG BEKAS */}
+        <button className={`tab-btn ${tab === 'jual' ? 'active' : ''}`} onClick={() => setTab('jual')} style={{ backgroundColor: tab === 'jual' ? '#10b981' : '#e2e8f0', color: tab === 'jual' ? 'white' : '#64748b' }}>💰 Jual Bekas/Rongsok</button>
       </div>
 
       {/* ================= FORM BARANG MASUK ================= */}
@@ -126,7 +148,6 @@ export default function TransaksiPage() {
           <form onSubmit={handleMasuk}>
             <div className="form-group" style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <label>Pilih Barang (Stok Saat Ini)</label>
-              {/* FITUR PENCARIAN DROPDOWN */}
               <input type="text" placeholder="🔍 Ketik nama barang untuk mencari..." value={searchMasuk} onChange={(e) => setSearchMasuk(e.target.value)} style={{ marginBottom: '10px', padding: '10px', width: '100%', borderRadius: '5px', border: '1px solid #1798D1' }} />
               <select required value={formMasuk.idBarang} onChange={(e) => setFormMasuk({...formMasuk, idBarang: e.target.value})}>
                 <option value="" disabled>-- Hasil Pencarian ({filteredBarangMasuk.length} barang) --</option>
@@ -216,7 +237,6 @@ export default function TransaksiPage() {
           <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>Catat ongkos jasa tanpa memotong stok gudang.</p>
           <form onSubmit={handleJasa}>
             <div className="form-group"><label>Tanggal Pekerjaan</label><input type="date" required value={formJasa.tanggal} onChange={(e) => setFormJasa({...formJasa, tanggal: e.target.value})} /></div>
-
             <div className="form-group" style={{ background: '#f5f3ff', padding: '15px', borderRadius: '8px', border: '1px solid #ddd6fe' }}>
               <label style={{ color: '#5b21b6' }}>Pilih Armada Truk</label>
               <input type="text" placeholder="🔍 Cari Truk / Plat..." value={searchJasaTruk} onChange={(e) => setSearchJasaTruk(e.target.value)} style={{ marginBottom: '10px', padding: '10px', width: '100%', borderRadius: '5px', border: '1px solid #c4b5fd' }} />
@@ -225,7 +245,6 @@ export default function TransaksiPage() {
                 {filteredTrukJasa.map(t => <option key={t.id} value={t.id}>{t.nama} - {t.plat}</option>)}
               </select>
             </div>
-
             <div className="form-group"><label>Keterangan Pekerjaan</label><input type="text" required value={formJasa.namaJasa} onChange={(e) => setFormJasa({...formJasa, namaJasa: e.target.value})} placeholder="Contoh: Turun Mesin, Las Bak" /></div>
             <div className="form-group"><label>Total Biaya (Rp)</label><input type="text" required value={formJasa.biaya} onChange={e => { const raw = e.target.value.replace(/[^0-9]/g, ''); setFormJasa({...formJasa, biaya: raw ? parseInt(raw, 10).toLocaleString('id-ID') : ''}); }} /></div>
             <div className="form-group"><label>Odometer Saat Ini (Opsional)</label><input type="number" value={formJasa.odo} onChange={(e) => setFormJasa({...formJasa, odo: e.target.value})} /></div>
@@ -234,6 +253,31 @@ export default function TransaksiPage() {
           </form>
         </div>
       )}
+
+      {/* ================= FORM PENJUALAN BEKAS (BARU) ================= */}
+      {tab === 'jual' && (
+        <div className="form-container" style={{ borderTop: '4px solid #10b981' }}>
+          <h3 style={{ marginBottom: '5px', color: '#10b981' }}>Form Penjualan Rongsok / Bekas</h3>
+          <p style={{ fontSize: '13px', color: '#666', marginBottom: '20px' }}>Catat pemasukan uang dari penjualan velg rusak, aki mati, kardus, atau besi tua.</p>
+          <form onSubmit={handleJualBekas}>
+            <div className="form-group"><label>Tanggal Penjualan</label><input type="date" required value={formJual.tanggal} onChange={(e) => setFormJual({...formJual, tanggal: e.target.value})} /></div>
+            <div className="form-group">
+              <label>Kategori / Nama Barang Terjual</label>
+              <input type="text" required value={formJual.namaBarang} onChange={(e) => setFormJual({...formJual, namaBarang: e.target.value})} placeholder="Contoh: Aki Bekas, Besi Tua, Velg Patah" />
+            </div>
+            <div className="form-group">
+              <label>Keterangan Tambahan</label>
+              <input type="text" value={formJual.keterangan} onChange={(e) => setFormJual({...formJual, keterangan: e.target.value})} placeholder="Contoh: Terjual ke Pengepul, Total 50 KG" />
+            </div>
+            <div className="form-group">
+              <label>Total Pendapatan (Rp)</label>
+              <input type="text" required placeholder="Contoh: 1.500.000" value={formJual.nominal} onChange={e => { const raw = e.target.value.replace(/[^0-9]/g, ''); setFormJual({...formJual, nominal: raw ? parseInt(raw, 10).toLocaleString('id-ID') : ''}); }} />
+            </div>
+            <button type="submit" className="btn-submit" disabled={prosesLoading} style={{ backgroundColor: '#10b981' }}>{prosesLoading ? "Memproses..." : "Simpan Uang Masuk"}</button>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }
