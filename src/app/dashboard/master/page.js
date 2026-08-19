@@ -40,7 +40,7 @@ export default function MasterDataPage() {
       const response = await fetch('/api/sas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "GET_DATA" })
+        body: JSON.stringify({ action: "GET_MASTER_SAJA" })
       });
       const result = await response.json();
       if (result.success) {
