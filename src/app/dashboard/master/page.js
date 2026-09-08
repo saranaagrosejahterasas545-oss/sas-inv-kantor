@@ -7,13 +7,15 @@ export default function MasterDataPage() {
   const [role, setRole] = useState('');
   const [dataTruk, setDataTruk] = useState([]);
   const [dataBarang, setDataBarang] = useState([]);
+  const [dataRiwayat, setDataRiwayat] = useState([]); // STATE BARU: Untuk menghitung Masuk/Keluar
   const [loading, setLoading] = useState(true);
   const [prosesLoading, setProsesLoading] = useState(false);
 
-  // State Pencarian & Filter Abjad
+  // State Pencarian & Filter
   const [searchTruk, setSearchTruk] = useState('');
   const [searchBarang, setSearchBarang] = useState('');
   const [selectedAbjad, setSelectedAbjad] = useState('SEMUA');
+  const [filterBulan, setFilterBulan] = useState(''); // STATE BARU: Filter Bulan untuk Master Barang
 
   // State Modal Tambah
   const [showModalTruk, setShowModalTruk] = useState(false);
@@ -40,12 +42,14 @@ export default function MasterDataPage() {
       const response = await fetch('/api/sas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "GET_MASTER_SAJA" })
+        // KEMBALI MENGGUNAKAN GET_DATA AGAR BISA MENGHITUNG KARTU STOK
+        body: JSON.stringify({ action: "GET_DATA" }) 
       });
       const result = await response.json();
       if (result.success) {
         setDataTruk(result.data.truk);
         setDataBarang(result.data.barang);
+        setDataRiwayat(result.data.transaksi || []); // Simpan riwayat transaksi
       }
     } catch (err) { 
       Swal.fire('Oops!', 'Gagal memuat data dari server.', 'error'); 
@@ -53,30 +57,20 @@ export default function MasterDataPage() {
     setLoading(false);
   };
 
-  // LOGIKA PENCARIAN TRUK
   const filteredTruk = dataTruk.filter(t => 
-    t.nama.toLowerCase().includes(searchTruk.toLowerCase()) || 
-    t.plat.toLowerCase().includes(searchTruk.toLowerCase())
+    t.nama.toLowerCase().includes(searchTruk.toLowerCase()) || t.plat.toLowerCase().includes(searchTruk.toLowerCase())
   );
   
-  // LOGIKA PENCARIAN & FILTER ABJAD BARANG
   const filteredBarang = dataBarang
     .filter(b => {
-      // 1. Filter Kata Kunci Teks
-      const matchText = b.nama.toLowerCase().includes(searchBarang.toLowerCase()) || 
-                        b.id.toLowerCase().includes(searchBarang.toLowerCase());
+      const matchText = b.nama.toLowerCase().includes(searchBarang.toLowerCase()) || b.id.toLowerCase().includes(searchBarang.toLowerCase());
       if (!matchText) return false;
-
-      // 2. Filter Abjad A-Z
       if (selectedAbjad === 'SEMUA') return true;
       const firstChar = b.nama.trim().charAt(0).toUpperCase();
-
-      if (selectedAbjad === '0-9') {
-        return /^[0-9]/.test(firstChar);
-      }
+      if (selectedAbjad === '0-9') return /^[0-9]/.test(firstChar);
       return firstChar === selectedAbjad;
     })
-    .sort((a, b) => a.nama.localeCompare(b.nama)); // Mengurutkan otomatis dari A-Z
+    .sort((a, b) => a.nama.localeCompare(b.nama));
 
   // ================= CRUD TRUK =================
   const handleSimpanTruk = async (e) => {
@@ -86,10 +80,8 @@ export default function MasterDataPage() {
       const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "TAMBAH_TRUK", ...formTruk, username }) });
       const result = await response.json();
       if (result.success) { Swal.fire({ title: 'Berhasil!', text: result.message, icon: 'success', timer: 2000, showConfirmButton: false }); setShowModalTruk(false); setFormTruk({ nama: '', plat: '', sopir: '', odo: '', merek: '' }); fetchData(); } else Swal.fire('Gagal!', result.message, 'error');
-    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); }
-    setProsesLoading(false);
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); } setProsesLoading(false);
   };
-
   const handleUpdateTruk = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
@@ -97,17 +89,13 @@ export default function MasterDataPage() {
       const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "EDIT_TRUK", ...editTruk, username }) });
       const result = await response.json();
       if (result.success) { Swal.fire({ title: 'Tersimpan!', text: result.message, icon: 'success', timer: 1500, showConfirmButton: false }); setShowEditTruk(false); fetchData(); } else Swal.fire('Gagal!', result.message, 'error');
-    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); }
-    setProsesLoading(false);
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); } setProsesLoading(false);
   };
-
   const handleHapusTruk = async (id) => {
     const confirmBox = await Swal.fire({ title: 'Yakin buang ke Arsip?', text: `Truk ${id} akan disembunyikan!`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ff4d4f', cancelButtonColor: '#888', confirmButtonText: 'Ya, Buang!', cancelButtonText: 'Batal' });
     if (confirmBox.isConfirmed) {
       const username = localStorage.getItem('sas_user');
-      try {
-        const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "HAPUS_TRUK", id, username }) });
-        const result = await response.json();
+      try { const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "HAPUS_TRUK", id, username }) }); const result = await response.json();
         if (result.success) { Swal.fire('Dihapus!', 'Data dipindahkan ke Arsip.', 'success'); fetchData(); } else { Swal.fire('Gagal!', result.message, 'error'); }
       } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); }
     }
@@ -122,10 +110,8 @@ export default function MasterDataPage() {
       const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "TAMBAH_BARANG", ...formBarang, harga: hargaBersih, username }) });
       const result = await response.json();
       if (result.success) { Swal.fire({ title: 'Berhasil!', text: result.message, icon: 'success', timer: 2000, showConfirmButton: false }); setShowModalBarang(false); setFormBarang({ nama: '', batas_km: '', stok: '', harga: '', tanggal: '' }); fetchData(); } else Swal.fire('Gagal!', result.message, 'error');
-    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); }
-    setProsesLoading(false);
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); } setProsesLoading(false);
   };
-
   const handleUpdateBarang = async (e) => {
     e.preventDefault(); setProsesLoading(true);
     const username = localStorage.getItem('sas_user');
@@ -134,17 +120,13 @@ export default function MasterDataPage() {
       const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "EDIT_BARANG", ...editBarang, harga: hargaBersih, username }) });
       const result = await response.json();
       if (result.success) { Swal.fire({ title: 'Tersimpan!', text: result.message, icon: 'success', timer: 1500, showConfirmButton: false }); setShowEditBarang(false); fetchData(); } else Swal.fire('Gagal!', result.message, 'error');
-    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); }
-    setProsesLoading(false);
+    } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); } setProsesLoading(false);
   };
-
   const handleHapusBarang = async (id) => {
     const confirmBox = await Swal.fire({ title: 'Yakin buang ke Arsip?', text: `Barang ${id} akan disembunyikan!`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ff4d4f', cancelButtonColor: '#888', confirmButtonText: 'Ya, Buang!', cancelButtonText: 'Batal' });
     if (confirmBox.isConfirmed) {
       const username = localStorage.getItem('sas_user');
-      try {
-        const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "HAPUS_BARANG", id, username }) });
-        const result = await response.json();
+      try { const response = await fetch('/api/sas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "HAPUS_BARANG", id, username }) }); const result = await response.json();
         if (result.success) { Swal.fire('Dihapus!', 'Data dipindahkan ke Arsip.', 'success'); fetchData(); } else { Swal.fire('Gagal!', result.message, 'error'); }
       } catch (error) { Swal.fire('Sistem Error', 'Terjadi kesalahan.', 'error'); }
     }
@@ -185,41 +167,40 @@ export default function MasterDataPage() {
                 </td>
               </tr>
             ))}
-            {filteredTruk.length === 0 && <tr><td colSpan="7" style={{textAlign:'center', padding:'20px'}}>Pencarian tidak ditemukan.</td></tr>}
           </tbody>
         </table>
       </div>
 
-      {/* ---------------- BARANG ---------------- */}
+      {/* ---------------- BARANG (KARTU STOK) ---------------- */}
       <div className="table-container">
+        
         <div className="header-table" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-          <h3>Daftar Inventory Barang</h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <input type="text" placeholder="🔍 Cari Barang..." value={searchBarang} onChange={(e) => setSearchBarang(e.target.value)} style={{ padding: '8px 12px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '220px' }} />
+          <h3 style={{ margin: 0 }}>Daftar Inventory Barang (Kartu Stok)</h3>
+          
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* FITUR BARU: FILTER BULAN */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f8fafc', padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>📅 Filter QTY:</label>
+              <select value={filterBulan} onChange={(e) => setFilterBulan(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '12px' }}>
+                <option value="">Semua Waktu (Total)</option>
+                <option value="2026-08">Agustus 2026</option>
+                <option value="2026-09">September 2026</option>
+                <option value="2026-10">Oktober 2026</option>
+                <option value="2026-11">November 2026</option>
+                <option value="2026-12">Desember 2026</option>
+              </select>
+            </div>
+
+            <input type="text" placeholder="🔍 Cari Barang..." value={searchBarang} onChange={(e) => setSearchBarang(e.target.value)} style={{ padding: '8px 12px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '180px' }} />
             {role === 'Manager' && <button className="btn-add" onClick={() => setShowModalBarang(true)}>+ Tambah Barang</button>}
           </div>
         </div>
 
-        {/* BARIS TOMBOL FILTER ABJAD (A-Z) */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', padding: '12px', background: '#f8fafc', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e2e8f0' }}>
           {daftarAbjad.map((huruf) => {
             const isActive = selectedAbjad === huruf;
             return (
-              <button
-                key={huruf}
-                onClick={() => setSelectedAbjad(huruf)}
-                style={{
-                  padding: huruf === 'SEMUA' ? '5px 12px' : '5px 9px',
-                  borderRadius: '6px',
-                  border: isActive ? '1px solid #1798D1' : '1px solid #cbd5e1',
-                  background: isActive ? '#1798D1' : '#ffffff',
-                  color: isActive ? '#ffffff' : '#334155',
-                  fontWeight: isActive ? 'bold' : 'normal',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
+              <button key={huruf} onClick={() => setSelectedAbjad(huruf)} style={{ padding: huruf === 'SEMUA' ? '5px 12px' : '5px 9px', borderRadius: '6px', border: isActive ? '1px solid #1798D1' : '1px solid #cbd5e1', background: isActive ? '#1798D1' : '#ffffff', color: isActive ? '#ffffff' : '#334155', fontWeight: isActive ? 'bold' : 'normal', fontSize: '12px', cursor: 'pointer', transition: 'all 0.15s ease' }}>
                 {huruf}
               </button>
             );
@@ -228,31 +209,81 @@ export default function MasterDataPage() {
 
         <table className="data-table">
           <thead>
-            <tr><th>ID</th><th>Nama Barang</th><th>Batas KM</th><th>Stok</th><th>Harga Satuan</th><th>Aksi</th></tr>
+            <tr>
+              <th>ID</th>
+              <th>Nama Barang</th>
+              <th style={{ backgroundColor: '#ecfdf5', color: '#047857' }}>Masuk (In)</th>
+              <th style={{ backgroundColor: '#fef2f2', color: '#b91c1c' }}>Keluar (Out)</th>
+              <th style={{ backgroundColor: '#f8fafc' }}>Sisa Gudang Aktual</th>
+              <th>Harga Satuan</th>
+              <th>Aksi</th>
+            </tr>
           </thead>
           <tbody>
-            {filteredBarang.map((barang) => (
-              <tr key={barang.id}>
-                <td>{barang.id}</td><td><strong>{barang.nama}</strong></td>
-                <td>{barang.batas_km > 0 ? `${barang.batas_km.toLocaleString('id-ID')} KM` : '-'}</td>
-                <td><span style={{ color: barang.stok <= 5 ? 'red' : 'green', fontWeight: 'bold' }}>{barang.stok}</span></td>
-                <td>Rp {barang.harga.toLocaleString('id-ID')}</td>
-                <td>
-                  {role === 'Manager' ? (
-                    <div style={{display:'flex', gap:'5px'}}>
-                      <button onClick={() => { setEditBarang({...barang, harga: barang.harga ? barang.harga.toLocaleString('id-ID') : ''}); setShowEditBarang(true); }} style={{background:'#F38C36', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>✏️ Edit</button>
-                      <button onClick={() => handleHapusBarang(barang.id)} style={{background:'#ff4d4f', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>🗑️ Hapus</button>
-                    </div>
-                  ) : <span style={{color:'#aaa', fontSize:'12px'}}>Dibatasi</span>}
-                </td>
-              </tr>
-            ))}
-            {filteredBarang.length === 0 && <tr><td colSpan="6" style={{textAlign:'center', padding:'20px'}}>Tidak ada barang untuk abjad <b>"{selectedAbjad}"</b>.</td></tr>}
+            {filteredBarang.map((barang) => {
+              
+              // MENGHITUNG BARANG MASUK & KELUAR BERDASARKAN FILTER BULAN
+              let qtyMasuk = 0;
+              let qtyKeluar = 0;
+
+              dataRiwayat.forEach(trx => {
+                // Pastikan barangnya cocok
+                if (trx.idBarang === barang.id) {
+                  // Cek apakah bulan transaksi sesuai dengan filter
+                  let matchBulan = true;
+                  if (filterBulan && trx.waktu_raw) {
+                    const d = new Date(trx.waktu_raw);
+                    const trxBulan = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
+                    if (trxBulan !== filterBulan) matchBulan = false;
+                  }
+
+                  // Jika bulan cocok (atau tidak ada filter bulan), jumlahkan
+                  if (matchBulan) {
+                    const jenis = String(trx.jenis).toUpperCase().trim();
+                    if (jenis === 'MASUK') qtyMasuk += Number(trx.jumlah);
+                    if (jenis === 'KELUAR') qtyKeluar += Number(trx.jumlah);
+                  }
+                }
+              });
+
+              return (
+                <tr key={barang.id}>
+                  <td>{barang.id}</td>
+                  <td>
+                    <strong>{barang.nama}</strong><br/>
+                    <span style={{ fontSize: '10px', color: '#888' }}>Batas: {barang.batas_km > 0 ? `${barang.batas_km.toLocaleString('id-ID')} KM` : '-'}</span>
+                  </td>
+                  
+                  <td style={{ color: '#059669', fontWeight: 'bold', fontSize: '15px' }}>
+                    {qtyMasuk > 0 ? `+ ${qtyMasuk}` : '-'}
+                  </td>
+                  <td style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '15px' }}>
+                    {qtyKeluar > 0 ? `- ${qtyKeluar}` : '-'}
+                  </td>
+                  
+                  <td style={{ backgroundColor: '#f8fafc' }}>
+                    <span style={{ color: barang.stok <= 5 ? 'red' : 'green', fontWeight: '900', fontSize: '16px' }}>{barang.stok}</span>
+                  </td>
+                  
+                  <td>Rp {barang.harga.toLocaleString('id-ID')}</td>
+                  
+                  <td>
+                    {role === 'Manager' ? (
+                      <div style={{display:'flex', gap:'5px'}}>
+                        <button onClick={() => { setEditBarang({...barang, harga: barang.harga ? barang.harga.toLocaleString('id-ID') : ''}); setShowEditBarang(true); }} style={{background:'#F38C36', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>✏️ Edit</button>
+                        <button onClick={() => handleHapusBarang(barang.id)} style={{background:'#ff4d4f', color:'#fff', border:'none', padding:'6px 10px', borderRadius:'5px', cursor:'pointer'}}>🗑️ Hapus</button>
+                      </div>
+                    ) : <span style={{color:'#aaa', fontSize:'12px'}}>Dibatasi</span>}
+                  </td>
+                </tr>
+              );
+            })}
+            {filteredBarang.length === 0 && <tr><td colSpan="7" style={{textAlign:'center', padding:'20px'}}>Tidak ada barang.</td></tr>}
           </tbody>
         </table>
       </div>
 
-      {/* ================= MODAL TAMBAH TRUK ================= */}
+      {/* ================= MODAL TETAP SAMA ================= */}
       {showModalTruk && (
         <div className="modal-overlay"><div className="modal-content"><h3>Tambah Armada Truk</h3>
           <form onSubmit={handleSimpanTruk}>
@@ -266,7 +297,6 @@ export default function MasterDataPage() {
         </div></div>
       )}
 
-      {/* ================= MODAL TAMBAH BARANG ================= */}
       {showModalBarang && (
         <div className="modal-overlay"><div className="modal-content"><h3>Tambah Barang</h3>
           <form onSubmit={handleSimpanBarang}>
@@ -280,7 +310,6 @@ export default function MasterDataPage() {
         </div></div>
       )}
 
-      {/* ================= MODAL EDIT TRUK ================= */}
       {showEditTruk && (
         <div className="modal-overlay"><div className="modal-content"><h3 style={{color:'#F38C36'}}>✏️ Edit Armada Truk</h3>
           <form onSubmit={handleUpdateTruk}>
@@ -294,7 +323,6 @@ export default function MasterDataPage() {
         </div></div>
       )}
 
-      {/* ================= MODAL EDIT BARANG ================= */}
       {showEditBarang && (
         <div className="modal-overlay"><div className="modal-content"><h3 style={{color:'#F38C36'}}>✏️ Edit Barang</h3>
           <form onSubmit={handleUpdateBarang}>
