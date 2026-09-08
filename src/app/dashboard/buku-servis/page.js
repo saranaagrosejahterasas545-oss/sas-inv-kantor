@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Swal from 'sweetalert2'; // Tambahan untuk pop-up konfirmasi
+import Swal from 'sweetalert2';
 
 export default function BukuServisPage() {
   const [dataTruk, setDataTruk] = useState([]);
@@ -18,16 +18,19 @@ export default function BukuServisPage() {
       const response = await fetch('/api/sas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: "GET_DATA" })
+        body: JSON.stringify({ action: "GET_DATA" }) // Buku servis tetap pakai GET_DATA karena butuh riwayat
       });
       const result = await response.json();
       if (result.success) {
         setDataTruk(result.data.truk);
         setDataBarang(result.data.barang); 
         
-        // Hanya ambil transaksi "KELUAR" untuk riwayat servis
-        const riwayatKeluar = result.data.transaksi.filter(t => t.jenis === "KELUAR").reverse();
-        setDataRiwayat(riwayatKeluar);
+        // PERBAIKAN: Ambil Barang "KELUAR" DAN "BIAYA JASA"
+        const riwayatServis = result.data.transaksi.filter(t => 
+          t.jenis === "KELUAR" || t.jenis === "BIAYA JASA"
+        ).reverse();
+        
+        setDataRiwayat(riwayatServis);
       }
     } catch (err) { alert("Gagal memuat data buku servis."); }
     setLoading(false);
@@ -36,10 +39,15 @@ export default function BukuServisPage() {
   useEffect(() => { fetchData(); }, []);
 
   // ================= LOGIKA BATALKAN TRANSAKSI (ROLLBACK) =================
-  const handleBatalkanTransaksi = async (idTrx) => {
+  const handleBatalkanTransaksi = async (idTrx, jenis) => {
+    const isJasa = jenis === "BIAYA JASA";
+    const pesanTeks = isJasa 
+      ? `Yakin ingin membatalkan transaksi jasa <b>${idTrx}</b>?`
+      : `Yakin ingin membatalkan transaksi servis <b>${idTrx}</b>?<br>Stok sparepart akan dikembalikan ke gudang.`;
+
     const confirmBox = await Swal.fire({
       title: 'Batalkan Transaksi?',
-      html: `Yakin ingin membatalkan transaksi servis <b>${idTrx}</b>?<br>Stok sparepart akan dikembalikan ke gudang.`,
+      html: pesanTeks,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ff4d4f',
@@ -61,7 +69,7 @@ export default function BukuServisPage() {
         
         if (result.success) {
           Swal.fire('Dibatalkan!', result.message, 'success');
-          fetchData(); // Refresh data agar tabel dan stok ter-update
+          fetchData(); 
         } else {
           Swal.fire('Gagal!', result.message, 'error');
         }
@@ -74,9 +82,7 @@ export default function BukuServisPage() {
 
   // ================= LOGIKA FILTER DATA =================
   const riwayatTampil = dataRiwayat.filter(trx => {
-    // 1. Filter Truk
     if (selectedTruk && trx.idTruk !== selectedTruk) return false;
-    // 2. Filter Bulan (format: YYYY-MM)
     if (filterBulan && trx.waktu_raw) {
       const d = new Date(trx.waktu_raw);
       const trxBulan = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0');
@@ -91,7 +97,6 @@ export default function BukuServisPage() {
   const totalBiayaTampil = riwayatTampil.reduce((sum, trx) => sum + (Number(trx.total_biaya) || 0), 0);
   const totalItemGanti = riwayatTampil.reduce((sum, trx) => sum + (Number(trx.jumlah) || 0), 0);
 
-  // Fungsi menerjemahkan format bulan menjadi teks cantik
   const getTeksPeriode = () => {
     if (!filterBulan) return "Semua Waktu";
     const [tahun, bulan] = filterBulan.split('-');
@@ -105,7 +110,7 @@ export default function BukuServisPage() {
     <div>
       <div className="print-hide">
         <h1 style={{ color: '#1798D1', marginBottom: '5px' }}>📖 Buku Servis Digital</h1>
-        <p style={{ color: '#666', marginBottom: '20px' }}>Pantau dan cetak riwayat penggantian sparepart per kendaraan.</p>
+        <p style={{ color: '#666', marginBottom: '20px' }}>Pantau dan cetak riwayat penggantian sparepart & jasa bengkel per kendaraan.</p>
 
         {/* KOTAK FILTER */}
         <div style={{ background: '#fff', padding: '20px', borderRadius: '15px', marginBottom: '25px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
@@ -134,7 +139,6 @@ export default function BukuServisPage() {
       {/* ================= KARTU PROFIL & RINGKASAN BIAYA ================= */}
       <div style={{ display: 'flex', gap: '20px', marginBottom: '25px', flexWrap: 'wrap' }}>
         
-        {/* KARTU PROFIL TRUK (Hanya tampil jika ada truk yang dipilih) */}
         {trukInfo && (
           <div style={{ flex: 2, minWidth: '300px', background: 'linear-gradient(135deg, #1798D1, #0c76a6)', color: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
             <h2 style={{ margin: '0 0 5px 0' }}>{trukInfo.nama}</h2>
@@ -145,7 +149,6 @@ export default function BukuServisPage() {
           </div>
         )}
 
-        {/* KARTU TOTAL BIAYA (Otomatis menghitung dari data yang tampil) */}
         <div style={{ flex: 1, minWidth: '280px', background: '#fff', padding: '20px', borderRadius: '15px', borderLeft: '6px solid #ff4d4f', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
           <h4 style={{ color: '#888', textTransform: 'uppercase', fontSize: '12px', margin: '0 0 5px 0' }}>
             Total Biaya Servis {trukInfo ? trukInfo.nama : '(Semua Armada)'}
@@ -154,7 +157,7 @@ export default function BukuServisPage() {
             Rp {totalBiayaTampil.toLocaleString('id-ID')}
           </h2>
           <p style={{ color: '#555', fontSize: '14px', margin: 0 }}>
-            Periode: <strong>{getTeksPeriode()}</strong> | Total: <strong>{totalItemGanti} Item</strong>
+            Periode: <strong>{getTeksPeriode()}</strong> | Transaksi: <strong>{totalItemGanti} Kali</strong>
           </p>
         </div>
 
@@ -173,70 +176,77 @@ export default function BukuServisPage() {
             <tr>
               <th>Tanggal</th>
               {!trukInfo && <th>Nama Truk</th>} 
-              <th>Sparepart / Barang</th>
+              <th>Item / Keterangan Pekerjaan</th>
+              <th>Jenis</th>
               <th>Jumlah</th>
               <th>Odo Saat Ganti & Target</th>
               <th>Total Biaya</th>
-              <th className="print-hide">Aksi</th> {/* TAMBAHAN KOLOM AKSI */}
+              <th className="print-hide">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {riwayatTampil.length > 0 ? (
-              riwayatTampil.map((trx, index) => (
-                <tr key={index}>
-                  <td>{trx.waktu_str}</td>
-                  {!trukInfo && <td>{trx.truk_nama}</td>}
-                  <td><strong>{trx.barang_nama_asli}</strong></td>
-                  <td>{trx.jumlah}</td>
-                  
-                  <td>
-                    {trx.odo !== "-" ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontWeight: 'bold', color: '#333' }}>{Number(trx.odo).toLocaleString('id-ID')} KM</span>
-                        {(() => {
-                          const brg = dataBarang.find(b => b.nama === trx.barang_nama_asli || b.id === trx.idBarang);
-                          const batas = brg ? (Number(brg.batas_km) || 0) : 0;
-                          if (batas > 0) {
-                            return (
-                              <div style={{ fontSize: '11px', color: '#ea580c', background: '#fff7ed', padding: '3px 6px', borderRadius: '4px', border: '1px solid #fdba74', width: 'fit-content', whiteSpace: 'nowrap' }}>
-                                🎯 Ganti: <b>{(Number(trx.odo) + batas).toLocaleString('id-ID')} KM</b>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                    ) : "-"}
-                  </td>
+              riwayatTampil.map((trx, index) => {
+                const isJasa = trx.jenis === "BIAYA JASA";
+                return (
+                  <tr key={index} style={{ backgroundColor: isJasa ? '#f5f3ff' : 'transparent' }}>
+                    <td>{trx.waktu_str}</td>
+                    {!trukInfo && <td>{trx.truk_nama}</td>}
+                    <td>
+                      <strong>{trx.barang_nama_asli}</strong>
+                      {isJasa && <span style={{ fontSize: '10px', display: 'block', color: '#8b5cf6' }}>*Bengkel Luar</span>}
+                    </td>
+                    <td>
+                      <span style={{
+                        padding: '3px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold',
+                        backgroundColor: isJasa ? '#c4b5fd' : '#fed7aa',
+                        color: isJasa ? '#5b21b6' : '#9a3412'
+                      }}>
+                        {isJasa ? 'JASA' : 'SPAREPART'}
+                      </span>
+                    </td>
+                    <td>{isJasa ? '-' : trx.jumlah}</td>
+                    
+                    <td>
+                      {trx.odo !== "-" && trx.odo > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#333' }}>{Number(trx.odo).toLocaleString('id-ID')} KM</span>
+                          {!isJasa && (() => {
+                            const brg = dataBarang.find(b => b.nama === trx.barang_nama_asli || b.id === trx.idBarang);
+                            const batas = brg ? (Number(brg.batas_km) || 0) : 0;
+                            if (batas > 0) {
+                              return (
+                                <div style={{ fontSize: '11px', color: '#ea580c', background: '#fff7ed', padding: '3px 6px', borderRadius: '4px', border: '1px solid #fdba74', width: 'fit-content', whiteSpace: 'nowrap' }}>
+                                  🎯 Ganti: <b>{(Number(trx.odo) + batas).toLocaleString('id-ID')} KM</b>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : "-"}
+                    </td>
 
-                  <td>Rp {trx.total_biaya.toLocaleString('id-ID')}</td>
+                    <td style={{ fontWeight: 'bold', color: '#ff4d4f' }}>Rp {trx.total_biaya.toLocaleString('id-ID')}</td>
 
-                  {/* TOMBOL BATALKAN TRANSAKSI */}
-                  <td className="print-hide">
-                    <button 
-                      onClick={() => handleBatalkanTransaksi(trx.id)} 
-                      style={{ 
-                        background: '#ff4d4f', 
-                        color: '#fff', 
-                        border: 'none', 
-                        padding: '6px 12px', 
-                        borderRadius: '5px', 
-                        cursor: 'pointer', 
-                        fontSize: '12px', 
-                        fontWeight: 'bold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px'
-                      }}
-                    >
-                      ❌ Batal
-                    </button>
-                  </td>
+                    <td className="print-hide">
+                      <button 
+                        onClick={() => handleBatalkanTransaksi(trx.id, trx.jenis)} 
+                        style={{ 
+                          background: '#ff4d4f', color: '#fff', border: 'none', padding: '6px 12px', 
+                          borderRadius: '5px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+                          display: 'flex', alignItems: 'center', gap: '5px'
+                        }}
+                      >
+                        ❌ Batal
+                      </button>
+                    </td>
 
-                </tr>
-              ))
+                  </tr>
+                );
+              })
             ) : (
-              <tr><td colSpan={trukInfo ? "6" : "7"} style={{textAlign: 'center'}}>Tidak ada riwayat servis pada periode ini.</td></tr>
+              <tr><td colSpan={trukInfo ? "7" : "8"} style={{textAlign: 'center', padding: '20px'}}>Tidak ada riwayat servis / jasa pada periode ini.</td></tr>
             )}
           </tbody>
         </table>
