@@ -25,10 +25,11 @@ export default function BukuServisPage() {
         setDataTruk(result.data.truk);
         setDataBarang(result.data.barang); 
         
-        // PERBAIKAN: Ambil Barang "KELUAR" DAN "BIAYA JASA"
-        const riwayatServis = result.data.transaksi.filter(t => 
-          t.jenis === "KELUAR" || t.jenis === "BIAYA JASA"
-        ).reverse();
+        // PERBAIKAN EXTRA KUAT: Ambil Semua yang mengandung kata KELUAR atau JASA
+        const riwayatServis = result.data.transaksi.filter(t => {
+          const jenisTrx = String(t.jenis || "").toUpperCase().trim();
+          return jenisTrx.includes("KELUAR") || jenisTrx.includes("JASA");
+        }).reverse();
         
         setDataRiwayat(riwayatServis);
       }
