@@ -41,10 +41,10 @@ export default function BukuServisPage() {
     return str;
   };
 
-  // Ambil URL bukti barang/nota (sesuai properti foto_url di Apps Script)
+  // Ambil URL bukti barang/nota (sesuai properti foto_url dari getMasterData)
   const getRawBukti = (trx) => cleanLink(trx.foto_url || trx.bukti || trx.foto);
 
-  // Ambil URL bukti odometer (opsional jika foto_odo sudah dikirim Apps Script)
+  // Ambil URL bukti odometer (jika dikirim Apps Script)
   const getRawFotoOdo = (trx) => cleanLink(trx.foto_odo);
 
   // Perbesar gambar bukti saat diklik
@@ -559,7 +559,7 @@ export default function BukuServisPage() {
                       )}
                     </td>
 
-                    {/* KOLOM BUKTI FOTO (BARANG/NOTA & ODO) */}
+                    {/* KOLOM BUKTI FOTO (DARI trx.foto_url) */}
                     <td style={{ textAlign: 'center' }}>
                       {rawBukti || rawOdo ? (
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
@@ -594,9 +594,14 @@ export default function BukuServisPage() {
                                   cursor: 'pointer',
                                 }}
                               />
-                              <span style={{ fontSize: '9px', color: '#1798D1', fontWeight: 'bold', marginTop: '2px' }}>
-                                {isJasa ? 'Nota' : 'Barang'}
-                              </span>
+                              <a
+                                href={rawBukti}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: '9px', color: '#1798D1', fontWeight: 'bold', marginTop: '2px', textDecoration: 'none' }}
+                              >
+                                {isJasa ? 'Nota ↗' : 'Barang ↗'}
+                              </a>
                             </div>
                           )}
 
@@ -626,9 +631,14 @@ export default function BukuServisPage() {
                                   cursor: 'pointer',
                                 }}
                               />
-                              <span style={{ fontSize: '9px', color: '#10b981', fontWeight: 'bold', marginTop: '2px' }}>
-                                Odo
-                              </span>
+                              <a
+                                href={rawOdo}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: '9px', color: '#10b981', fontWeight: 'bold', marginTop: '2px', textDecoration: 'none' }}
+                              >
+                                Odo ↗
+                              </a>
                             </div>
                           )}
                         </div>
