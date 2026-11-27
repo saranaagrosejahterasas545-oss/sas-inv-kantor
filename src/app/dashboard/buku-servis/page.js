@@ -218,19 +218,19 @@ export default function BukuServisPage() {
             alignItems: 'flex-end',
           }}
         >
-          <div style={{ flex: 1, minWidth: '180px' }}>
+          <div style={{ flex: 1.3, minWidth: '220px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px' }}>
-              1. Pilih Armada Truk
+              1. Pilih Armada Truk / Sopir
             </label>
             <select
               value={selectedTruk}
               onChange={(e) => setSelectedTruk(e.target.value)}
               style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
             >
-              <option value="">-- Semua Truk --</option>
+              <option value="">-- Semua Truk / Sopir --</option>
               {dataTruk.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.nama} ({t.plat})
+                  {t.nama} ({t.plat}){t.sopir && t.sopir !== '-' ? ` — Sopir: ${t.sopir}` : ''}
                 </option>
               ))}
             </select>
@@ -464,7 +464,7 @@ export default function BukuServisPage() {
           <thead>
             <tr>
               <th>Tanggal</th>
-              {!trukInfo && <th>Truk Armada</th>}
+              {!trukInfo && <th>Truk & Sopir</th>}
               <th>Item / Pekerjaan</th>
               <th>Jenis</th>
               <th>QTY (Keluar)</th>
@@ -481,6 +481,7 @@ export default function BukuServisPage() {
                 const brg = dataBarang.find(
                   (b) => b.id === trx.idBarang || b.nama === trx.barang_nama_asli
                 );
+                const trukDetail = dataTruk.find((t) => t.id === trx.idTruk);
 
                 const rawBukti = getRawBukti(trx);
                 const imgBuktiUrl = getDirectImageUrl(rawBukti);
@@ -496,6 +497,11 @@ export default function BukuServisPage() {
                     {!trukInfo && (
                       <td>
                         <strong>{trx.truk_nama}</strong>
+                        {trukDetail?.sopir && trukDetail.sopir !== '-' && (
+                          <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                            Sopir: {trukDetail.sopir}
+                          </span>
+                        )}
                       </td>
                     )}
 
