@@ -12,26 +12,60 @@ export default function BukuServisPage() {
   const [selectedTruk, setSelectedTruk] = useState('');
   const [selectedBarang, setSelectedBarang] = useState('');
   const [filterBulan, setFilterBulan] = useState('');
+  const [filterBukti, setFilterBukti] = useState('');
 
-  // Helper: Ubah link share Google Drive menjadi link gambar langsung
+  // Ekstrak ID file Google Drive dari link file.getUrl()
+  const extractDriveId = (url) => {
+    if (!url) return null;
+    const cleanUrl = String(url).trim();
+    if (!cleanUrl.includes('drive.google.com') && !cleanUrl.includes('docs.google.com')) return null;
+    const match = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+  };
+
+  // Konversi link Google Drive menjadi URL gambar langsung
   const getDirectImageUrl = (url) => {
     if (!url) return '';
     const cleanUrl = String(url).trim();
-    const driveMatch = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (cleanUrl.includes('drive.google.com') && driveMatch && driveMatch[1]) {
-      return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+    const driveId = extractDriveId(cleanUrl);
+    if (driveId) {
+      return `https://lh3.googleusercontent.com/d/${driveId}`;
     }
     return cleanUrl;
   };
 
-  // Helper: Perbesar gambar saat diklik
-  const handlePreviewGambar = (imgUrl, namaBarang) => {
-    if (!imgUrl) return;
+  // Bersihkan nilai URL dari "-" atau kosong
+  const cleanLink = (val) => {
+    const str = String(val || '').trim();
+    if (!str || str === '-' || str.toLowerCase() === 'null') return '';
+    return str;
+  };
+
+  // Ambil URL bukti barang/nota (sesuai properti foto_url di Apps Script)
+  const getRawBukti = (trx) => cleanLink(trx.foto_url || trx.bukti || trx.foto);
+
+  // Ambil URL bukti odometer (opsional jika foto_odo sudah dikirim Apps Script)
+  const getRawFotoOdo = (trx) => cleanLink(trx.foto_odo);
+
+  // Perbesar gambar bukti saat diklik
+  const handlePreviewBukti = (rawUrl, imgUrl, labelJenis, trx) => {
+    if (!rawUrl) return;
     Swal.fire({
-      title: namaBarang,
+      title: `${labelJenis}: ${trx.truk_nama || 'Armada'}`,
+      html: `
+        <div style="font-size: 13px; color: #555; margin-bottom: 10px;">
+          Item: <b>${trx.barang_nama_asli}</b><br/>
+          Tanggal: <b>${trx.waktu_str || '-'}</b> | Odo: <b>${trx.odo && trx.odo !== '-' ? Number(trx.odo).toLocaleString('id-ID') + ' KM' : '-'}</b> | Biaya: <b>Rp ${Number(trx.total_biaya || 0).toLocaleString('id-ID')}</b>
+        </div>
+        <div style="margin-top: 8px;">
+          <a href="${rawUrl}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; color: #1798D1; text-decoration: underline;">
+            Buka File Asli di Google Drive ↗
+          </a>
+        </div>
+      `,
       imageUrl: imgUrl,
-      imageAlt: namaBarang,
-      imageHeight: 320,
+      imageAlt: `${labelJenis} ${trx.barang_nama_asli}`,
+      imageHeight: 340,
       confirmButtonText: 'Tutup',
       confirmButtonColor: '#1798D1',
     });
@@ -119,6 +153,11 @@ export default function BukuServisPage() {
       const trxBulan = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       if (trxBulan !== filterBulan) return false;
     }
+
+    const punyaBukti = Boolean(getRawBukti(trx) || getRawFotoOdo(trx));
+    if (filterBukti === 'ADA' && !punyaBukti) return false;
+    if (filterBukti === 'TIDAK' && punyaBukti) return false;
+
     return true;
   });
 
@@ -137,6 +176,8 @@ export default function BukuServisPage() {
   const totalItemGanti = parseFloat(
     riwayatTampil.reduce((sum, trx) => sum + (Number(trx.jumlah) || 0), 0).toFixed(1)
   );
+
+  const jumlahAdaBukti = riwayatTampil.filter((trx) => Boolean(getRawBukti(trx) || getRawFotoOdo(trx))).length;
 
   const getTeksPeriode = () => {
     if (!filterBulan) return 'Semua Waktu';
@@ -159,9 +200,9 @@ export default function BukuServisPage() {
   return (
     <div>
       <div className="print-hide">
-        <h1 style={{ color: '#1798D1', marginBottom: '5px' }}>Buku Servis & Pelacakan</h1>
+        <h1 style={{ color: '#1798D1', marginBottom: '5px' }}>Buku Servis & Bukti Armada</h1>
         <p style={{ color: '#666', marginBottom: '20px' }}>
-          Pantau riwayat perbaikan armada, foto sparepart terpasang, dan total pemakaian barang.
+          Pantau riwayat perbaikan armada, cek lampiran foto bukti transaksi, dan rekap biaya servis.
         </p>
 
         {/* KOTAK FILTER */}
@@ -172,12 +213,12 @@ export default function BukuServisPage() {
             borderRadius: '15px',
             marginBottom: '25px',
             display: 'flex',
-            gap: '15px',
+            gap: '12px',
             flexWrap: 'wrap',
             alignItems: 'flex-end',
           }}
         >
-          <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ flex: 1, minWidth: '180px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px' }}>
               1. Pilih Armada Truk
             </label>
@@ -195,7 +236,7 @@ export default function BukuServisPage() {
             </select>
           </div>
 
-          <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ flex: 1, minWidth: '180px' }}>
             <label
               style={{
                 display: 'block',
@@ -205,7 +246,7 @@ export default function BukuServisPage() {
                 color: '#10b981',
               }}
             >
-              2. Lacak Sparepart Tertentu
+              2. Lacak Sparepart
             </label>
             <select
               value={selectedBarang}
@@ -239,14 +280,37 @@ export default function BukuServisPage() {
             </select>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ flex: 1, minWidth: '150px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                color: '#1798D1',
+              }}
+            >
+              4. Filter Foto Bukti
+            </label>
+            <select
+              value={filterBukti}
+              onChange={(e) => setFilterBukti(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #1798D1' }}
+            >
+              <option value="">-- Semua Status --</option>
+              <option value="ADA">Ada Foto Bukti</option>
+              <option value="TIDAK">Belum Ada Bukti</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={() => window.print()}
               style={{
                 background: '#555',
                 color: '#fff',
                 border: 'none',
-                padding: '10px 16px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 fontWeight: 'bold',
@@ -259,12 +323,13 @@ export default function BukuServisPage() {
                 setSelectedTruk('');
                 setSelectedBarang('');
                 setFilterBulan('');
+                setFilterBukti('');
               }}
               style={{
                 background: '#F38C36',
                 color: '#fff',
                 border: 'none',
-                padding: '10px 16px',
+                padding: '10px 14px',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 fontWeight: 'bold',
@@ -293,18 +358,29 @@ export default function BukuServisPage() {
             <p style={{ margin: 0, fontSize: '15px', opacity: 0.9 }}>
               Plat: <strong>{trukInfo.plat}</strong> | Sopir: <strong>{trukInfo.sopir}</strong>
             </p>
-            <div
-              style={{
-                marginTop: '15px',
-                display: 'inline-block',
-                background: 'rgba(255, 255, 255, 0.2)',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                fontWeight: 'bold',
-              }}
-            >
-              Odo Terakhir: {Number(trukInfo.odo || 0).toLocaleString('id-ID')} KM
+            <div style={{ marginTop: '15px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Odo Terakhir: {Number(trukInfo.odo || 0).toLocaleString('id-ID')} KM
+              </span>
+              <span
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Bukti Terlampir: {jumlahAdaBukti} / {riwayatTampil.length}
+              </span>
             </div>
           </div>
         )}
@@ -320,27 +396,10 @@ export default function BukuServisPage() {
               borderRadius: '15px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              {getDirectImageUrl(barangInfo.gambar || barangInfo.foto || barangInfo.image) && (
-                <img
-                  src={getDirectImageUrl(barangInfo.gambar || barangInfo.foto || barangInfo.image)}
-                  alt={barangInfo.nama}
-                  style={{
-                    width: '64px',
-                    height: '64px',
-                    objectFit: 'cover',
-                    borderRadius: '10px',
-                    border: '2px solid rgba(255,255,255,0.6)',
-                  }}
-                />
-              )}
-              <div>
-                <h2 style={{ margin: '0 0 5px 0' }}>{barangInfo.nama}</h2>
-                <p style={{ margin: 0, fontSize: '15px', opacity: 0.9 }}>
-                  Sisa Stok di Gudang: <strong>{parseFloat(Number(barangInfo.stok || 0).toFixed(1))}</strong>
-                </p>
-              </div>
-            </div>
+            <h2 style={{ margin: '0 0 5px 0' }}>{barangInfo.nama}</h2>
+            <p style={{ margin: 0, fontSize: '15px', opacity: 0.9 }}>
+              Sisa Stok di Gudang: <strong>{parseFloat(Number(barangInfo.stok || 0).toFixed(1))}</strong>
+            </p>
             <div
               style={{
                 marginTop: '15px',
@@ -381,10 +440,24 @@ export default function BukuServisPage() {
 
       {/* ================= TABEL RIWAYAT ================= */}
       <div className="table-container">
-        <div style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '2px solid #eee' }}>
-          <h2 style={{ color: '#333', marginBottom: '5px', fontSize: '20px' }}>
+        <div
+          style={{
+            marginBottom: '15px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #eee',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <h2 style={{ color: '#333', margin: 0, fontSize: '20px' }}>
             Laporan Riwayat Servis {trukInfo ? `Armada: ${trukInfo.nama}` : '(Semua Armada)'}
           </h2>
+          <span style={{ fontSize: '13px', color: '#64748b' }}>
+            Menampilkan <strong>{riwayatTampil.length}</strong> transaksi ({jumlahAdaBukti} ada foto bukti)
+          </span>
         </div>
 
         <table className="data-table">
@@ -392,11 +465,11 @@ export default function BukuServisPage() {
             <tr>
               <th>Tanggal</th>
               {!trukInfo && <th>Truk Armada</th>}
-              <th style={{ width: '65px', textAlign: 'center' }}>Foto</th>
               <th>Item / Pekerjaan</th>
               <th>Jenis</th>
               <th>QTY (Keluar)</th>
               <th>Odo Saat Ganti & Target</th>
+              <th style={{ width: '115px', textAlign: 'center' }}>Bukti Foto</th>
               <th>Total Biaya</th>
               <th className="print-hide">Aksi</th>
             </tr>
@@ -408,9 +481,14 @@ export default function BukuServisPage() {
                 const brg = dataBarang.find(
                   (b) => b.id === trx.idBarang || b.nama === trx.barang_nama_asli
                 );
-                const rawImg =
-                  brg?.gambar || brg?.foto || brg?.image || brg?.url_gambar || trx.gambar || '';
-                const imgUrl = getDirectImageUrl(rawImg);
+
+                const rawBukti = getRawBukti(trx);
+                const imgBuktiUrl = getDirectImageUrl(rawBukti);
+                const driveIdBukti = extractDriveId(rawBukti);
+
+                const rawOdo = getRawFotoOdo(trx);
+                const imgOdoUrl = getDirectImageUrl(rawOdo);
+                const driveIdOdo = extractDriveId(rawOdo);
 
                 return (
                   <tr key={index} style={{ backgroundColor: isJasa ? '#f5f3ff' : 'transparent' }}>
@@ -420,67 +498,6 @@ export default function BukuServisPage() {
                         <strong>{trx.truk_nama}</strong>
                       </td>
                     )}
-
-                    {/* KOLOM FOTO BARANG */}
-                    <td style={{ textAlign: 'center' }}>
-                      {isJasa ? (
-                        <div
-                          title="Jasa Bengkel Luar"
-                          style={{
-                            width: '46px',
-                            height: '46px',
-                            margin: '0 auto',
-                            borderRadius: '8px',
-                            backgroundColor: '#ede9fe',
-                            color: '#6d28d9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '18px',
-                          }}
-                        >
-                          🛠️
-                        </div>
-                      ) : imgUrl ? (
-                        <img
-                          src={imgUrl}
-                          alt={trx.barang_nama_asli}
-                          onClick={() => handlePreviewGambar(imgUrl, trx.barang_nama_asli)}
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                          title="Klik untuk perbesar foto barang"
-                          style={{
-                            width: '46px',
-                            height: '46px',
-                            objectFit: 'cover',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer',
-                            display: 'block',
-                            margin: '0 auto',
-                          }}
-                        />
-                      ) : (
-                        <div
-                          title="Belum ada foto barang"
-                          style={{
-                            width: '46px',
-                            height: '46px',
-                            margin: '0 auto',
-                            borderRadius: '8px',
-                            backgroundColor: '#f1f5f9',
-                            color: '#94a3b8',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '16px',
-                          }}
-                        >
-                          📦
-                        </div>
-                      )}
-                    </td>
 
                     <td>
                       <strong>{trx.barang_nama_asli}</strong>
@@ -539,6 +556,95 @@ export default function BukuServisPage() {
                         </div>
                       ) : (
                         '-'
+                      )}
+                    </td>
+
+                    {/* KOLOM BUKTI FOTO (BARANG/NOTA & ODO) */}
+                    <td style={{ textAlign: 'center' }}>
+                      {rawBukti || rawOdo ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                          {rawBukti && (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <img
+                                src={imgBuktiUrl}
+                                alt={isJasa ? 'Bukti Nota' : 'Bukti Barang'}
+                                onClick={() =>
+                                  handlePreviewBukti(
+                                    rawBukti,
+                                    imgBuktiUrl,
+                                    isJasa ? 'Bukti Nota Bengkel' : 'Bukti Pengambilan Barang',
+                                    trx
+                                  )
+                                }
+                                onError={(e) => {
+                                  if (driveIdBukti && !e.currentTarget.dataset.retried) {
+                                    e.currentTarget.dataset.retried = 'true';
+                                    e.currentTarget.src = `https://drive.google.com/thumbnail?id=${driveIdBukti}&sz=w800`;
+                                  } else {
+                                    e.currentTarget.style.display = 'none';
+                                  }
+                                }}
+                                title="Klik untuk perbesar foto"
+                                style={{
+                                  width: '44px',
+                                  height: '44px',
+                                  objectFit: 'cover',
+                                  borderRadius: '7px',
+                                  border: '2px solid #1798D1',
+                                  cursor: 'pointer',
+                                }}
+                              />
+                              <span style={{ fontSize: '9px', color: '#1798D1', fontWeight: 'bold', marginTop: '2px' }}>
+                                {isJasa ? 'Nota' : 'Barang'}
+                              </span>
+                            </div>
+                          )}
+
+                          {rawOdo && (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <img
+                                src={imgOdoUrl}
+                                alt="Bukti Odometer"
+                                onClick={() =>
+                                  handlePreviewBukti(rawOdo, imgOdoUrl, 'Bukti Foto Odometer', trx)
+                                }
+                                onError={(e) => {
+                                  if (driveIdOdo && !e.currentTarget.dataset.retried) {
+                                    e.currentTarget.dataset.retried = 'true';
+                                    e.currentTarget.src = `https://drive.google.com/thumbnail?id=${driveIdOdo}&sz=w800`;
+                                  } else {
+                                    e.currentTarget.style.display = 'none';
+                                  }
+                                }}
+                                title="Klik untuk perbesar foto odometer"
+                                style={{
+                                  width: '44px',
+                                  height: '44px',
+                                  objectFit: 'cover',
+                                  borderRadius: '7px',
+                                  border: '2px solid #10b981',
+                                  cursor: 'pointer',
+                                }}
+                              />
+                              <span style={{ fontSize: '9px', color: '#10b981', fontWeight: 'bold', marginTop: '2px' }}>
+                                Odo
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            color: '#94a3b8',
+                            background: '#f1f5f9',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            display: 'inline-block',
+                          }}
+                        >
+                          Kosong
+                        </span>
                       )}
                     </td>
 
